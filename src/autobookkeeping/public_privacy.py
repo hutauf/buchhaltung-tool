@@ -27,9 +27,13 @@ def private_fingerprints(repo):
     for key,value in environment.items():
         if value and len(value)>=4 and any(part in key.upper() for part in ('PASSWORD','TOKEN','SECRET','API_KEY','EMAIL')):
             values.add(value.casefold())
-    from autobookkeeping.archive import Archive,unseal
+    from autobookkeeping.archive import Archive,unseal,sha
     archive=Archive(data)
     if not archive.key_path.exists():return values
+    from autobookkeeping.workspace import assert_data_repo
+    assert_data_repo(data)
+    values.update(git(data,'rev-list','--all').decode().splitlines())
+    values.add(sha((archive.root/'database.json.enc').read_bytes()))
     identifiers={'order_id','orderid','order_id_aliases','tracking_number','trackingnumber','transaction_id','transactionid','item_id','itemid','invoice_id','expense_id','receipt_id'}
     personal={'name','firstname','lastname','fullname','email','street','street1','street2','address1','address2','iban','tax_number'}
     def walk(value,path=(),field=''):
@@ -41,6 +45,7 @@ def private_fingerprints(repo):
             text=str(value).strip()
             if not text:return
             if field in identifiers and len(text)>=6:values.add(text.casefold())
+            if field in ('sha256','sha256_plaintext','sha256_ciphertext') and len(text)>=32:values.add(text.casefold())
             if field in personal and len(text)>=4 and text.casefold() not in ('berlin','deutschland') and any(any(part in name for part in ('buyer','customer','issuer','shipping_address')) for name in path[:-1]):
                 values.add(text.casefold())
     walk(archive.catalog())

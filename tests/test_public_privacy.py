@@ -65,3 +65,18 @@ def test_personal_paths_and_orders_and_secret_substrings_are_blocked():
 def test_word_matching_does_not_confuse_names_with_code_substrings():
     assert not content_issues(b'character',{'char'})
     assert 'private_fingerprint' in content_issues(b'CHAR',{'char'})
+
+
+def test_anonymous_private_dashboard_snapshot_is_also_blocked(repo):
+    from autobookkeeping.archive import Archive,sha
+    data=repo/'daten';data.mkdir()
+    git(data,'init','-b','main');git(data,'config','user.name',NAME);git(data,'config','user.email',EMAIL)
+    (data/'.bookkeeping-data.json').write_text('{"role":"data"}')
+    (data/'.env').write_text('ENCRYPTION_PASSWORD=SYNTHETIC-PRIVATE-PASSWORD\n')
+    (data/'.gitignore').write_text('.env\n')
+    archive=Archive(data);archive.init();git(data,'add','.');git(data,'commit','-m','Synthetic data')
+    (repo/'.gitignore').write_text('/daten/\n');docs=repo/'docs';docs.mkdir()
+    (docs/'snapshot.html').write_text('<script>{"source_sha256":"'+sha((archive.root/'database.json.enc').read_bytes())+'"}</script>')
+    git(repo,'add','.');git(repo,'commit','-m','Synthetic anonymous snapshot')
+    result=audit(repo,NAME,EMAIL)
+    assert not result['ok'] and any(i.get('path')=='docs/snapshot.html' and i['reason']=='private_fingerprint' for i in result['issues'])
