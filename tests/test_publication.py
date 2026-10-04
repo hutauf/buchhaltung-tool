@@ -1,5 +1,6 @@
 import io
 import json
+import os
 import runpy
 import shutil
 import subprocess
@@ -49,6 +50,12 @@ def fixture(tmp_path, monkeypatch):
         context = BytesSerializationContext(); detached.serialize(context); proof.write_bytes(context.getbytes())
     monkeypatch.setattr(Publication, 'stamp', stamp)
     monkeypatch.delenv('BOOKKEEPING_EXPECTED_SNAPSHOT', raising=False)
+    # Subprocesses must import this synthetic checkout, not the installed source.
+    import sys
+    result = subprocess.check_output([sys.executable, '-c',
+        'from autobookkeeping.workspace import TOOL_ROOT; print(TOOL_ROOT)'],
+        env={**os.environ, 'PYTHONPATH':str(tool/'src')})
+    assert Path(result.decode().strip()).resolve() == tool.resolve()
     return repo, archive, git
 
 
@@ -196,6 +203,7 @@ def test_hook_can_reacquire_archive_lock(fixture):
     hook = repo / '.git/hooks/pre-commit'
     executable = Path(sys.executable).as_posix()
     hook.write_bytes((f"#!/bin/sh\nexec '{executable}' -X utf8 {(repo.parent / 'scripts/build_bookkeeping_dashboard.py').as_posix()} --staged\n").encode('utf8'))
+    hook.chmod(0o755)
     assert_complete(repo, archive, git, save(repo, archive))
 
 

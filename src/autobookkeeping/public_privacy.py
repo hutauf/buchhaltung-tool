@@ -79,10 +79,14 @@ def content_issues(data,fingerprints,secrets=()):
     return issues
 
 
-def audit(repo,name,email,staged=False,extra=(),fingerprints=None):
+def audit(repo,name,email,staged=False,extra=(),fingerprints=None,historical_identities=None):
     repo=Path(repo).resolve();issues=[];entries=[];commits=[]
     fingerprints=private_fingerprints(repo) if fingerprints is None else fingerprints
     loaded=bool(fingerprints)
+    historical_identities=historical_identities or {}
+    for commit,identity in historical_identities.items():
+        if not re.fullmatch(r'[a-f0-9]{40}|[a-f0-9]{64}',commit) or len(identity)!=2 or not identity[1].endswith('@users.noreply.github.com'):
+            raise ValueError('Ungültige historische öffentliche Git-Identität')
     pattern=re.compile(r'(?<!\w)(?:'+'|'.join(re.escape(v) for v in sorted(fingerprints,key=len,reverse=True))+r')(?!\w)') if fingerprints else None
     secrets=[]
     if (repo/'daten/.env').exists():
@@ -105,7 +109,8 @@ def audit(repo,name,email,staged=False,extra=(),fingerprints=None):
             raw=git(repo,'cat-file','commit',commit);headers=raw.split(b'\n\n',1)[0].decode()
             for field in ('author','committer'):
                 match=re.search(r'^'+field+r' (.*?) <(.*?)> \d+ [+-]\d{4}$',headers,re.M)
-                if not match or match.groups()!=(name,email):issues.append({'scope':'commit','reason':'unexpected_identity'})
+                expected=tuple(historical_identities.get(commit,(name,email)))
+                if not match or match.groups()!=expected:issues.append({'scope':'commit','reason':'unexpected_identity'})
             for reason in content_issues(raw,pattern,secrets):issues.append({'scope':'commit','reason':reason})
             for entry in git(repo,'ls-tree','-r','-z',commit).split(b'\0'):
                 if entry:

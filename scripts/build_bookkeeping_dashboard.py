@@ -16,7 +16,7 @@ CODE = ["scripts/build_bookkeeping_dashboard.py", "scripts/dashboard_view.html",
         "scripts/bookkeeping_action.py", "scripts/publish_bookkeeping.py", "scripts/homeoffice.py",
         "scripts/receipt.py", "scripts/local_invoice.py", "scripts/bookkeeping_archive.py",
         *["src/autobookkeeping/"+name+".py" for name in
-          ("workspace", "archive", "dashboard", "adjustments", "cashflow", "local_invoices", "taxes", "ledger_validation", "receipts", "homeoffice", "publication", "timestamps", "models")]]
+          ("__init__", "workspace", "archive", "checklist", "dashboard", "adjustments", "cashflow", "local_invoices", "taxes", "ledger_validation", "receipts", "homeoffice", "publication", "timestamps", "models")]]
 
 
 def git(repo, *args):

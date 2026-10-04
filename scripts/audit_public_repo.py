@@ -3,6 +3,7 @@ import argparse
 import json
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 TOOL=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(TOOL/'src'))
@@ -24,7 +25,10 @@ def main():
             fields=line.split()
             if len(fields)!=4:raise ValueError('Ungültige Push-Referenz')
             if set(fields[1])!={'0'}:extra.append(fields[1])
-    result=audit(TOOL,args.name or configured('bookkeeping.publicName'),args.email or configured('bookkeeping.publicEmail'),args.staged,extra)
+    policy=TOOL/'.github/public-identities.toml'
+    identities=tomllib.loads(policy.read_text(encoding='utf8')).get('commits',{}) if policy.exists() else {}
+    identities={commit:(identity['name'],identity['email']) for commit,identity in identities.items()}
+    result=audit(TOOL,args.name or configured('bookkeeping.publicName'),args.email or configured('bookkeeping.publicEmail'),args.staged,extra,historical_identities=identities)
     print(json.dumps(result,ensure_ascii=False,indent=2));return int(not result['ok'])
 
 

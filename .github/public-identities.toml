@@ -1,0 +1,9 @@
+# Preserve the two already published code hashes when correcting the public alias.
+# Exceptions apply to these exact commits only; all new commits use hutauf.
+[commits.ef79dec507b1ee6ed36822805260f699b54e364d]
+name = "Hut auf"
+email = "13893694+hutauf@users.noreply.github.com"
+
+[commits.00f3ea096c32007928d0de092635d016141d6f45]
+name = "Hut auf"
+email = "13893694+hutauf@users.noreply.github.com"

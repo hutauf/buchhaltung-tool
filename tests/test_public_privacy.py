@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from autobookkeeping.public_privacy import audit,content_issues
 
-NAME='Hut auf'
+NAME='hutauf'
 EMAIL='synthetic@users.noreply.github.com'
 
 
@@ -42,6 +42,17 @@ def test_private_author_identity_is_blocked(repo):
     git(repo,'config','user.name','SYNTHETIC PRIVATE AUTHOR')
     git(repo,'commit','--allow-empty','-m','Synthetic identity test')
     assert any(i['reason']=='unexpected_identity' for i in audit(repo,NAME,EMAIL,fingerprints=set())['issues'])
+
+
+def test_historical_alias_exception_cannot_authorize_future_commits(repo):
+    old=git(repo,'rev-parse','HEAD')
+    git(repo,'config','user.name','SYNTHETIC NEW ALIAS')
+    git(repo,'commit','--allow-empty','-m','Synthetic alias correction')
+    historical={old:(NAME,EMAIL)}
+    assert audit(repo,'SYNTHETIC NEW ALIAS',EMAIL,fingerprints=set(),historical_identities=historical)['ok']
+    git(repo,'config','user.name',NAME)
+    git(repo,'commit','--allow-empty','-m','Synthetic forbidden old alias reuse')
+    assert not audit(repo,'SYNTHETIC NEW ALIAS',EMAIL,fingerprints=set(),historical_identities=historical)['ok']
 
 
 def test_direct_push_of_unreferenced_private_commit_is_checked(repo):

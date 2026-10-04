@@ -13,7 +13,6 @@ sys.path.insert(0, str(TOOL / "src"))
 
 from bs4 import BeautifulSoup
 from autobookkeeping.workspace import data_root
-ROOT = data_root()
 from filelock import FileLock
 from autobookkeeping.publication import Publication, resume
 from autobookkeeping.archive import Archive, clean_source, encoded, outside, sha
@@ -92,7 +91,7 @@ def read_checks(order, settings, trial: bool) -> dict:
     # Use the existing IMAP helper; suppress signed receipt links in saved metadata/stdout.
     if order.tracking_number:
         run = subprocess.run([sys.executable, "-X", "utf8", str(TOOL / "scripts/find_dhl_receipt.py"), order.tracking_number],
-                             cwd=ROOT, capture_output=True, timeout=90, check=True)
+                             cwd=data_root(), capture_output=True, timeout=90, check=True)
         result = json.loads(run.stdout)
         if not result.get("ok"):
             raise WorkflowError("DHL-Mailprüfung nicht erfolgreich")
@@ -137,6 +136,7 @@ def main() -> dict:
     p = sub.add_parser("expense")
     p.add_argument("invoice_id"); p.add_argument("--receipt-sha256", required=True); p.add_argument("--approved", action="store_true")
     args = parser.parse_args()
+    ROOT = data_root()
     (ROOT / "output").mkdir(exist_ok=True)
     if args.command == "recover" and (ROOT / "output/publication.json").exists():
         return {"ok": True, "publication": resume(ROOT)}
