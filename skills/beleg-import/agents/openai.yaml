@@ -1,0 +1,4 @@
+interface:
+  display_name: "Ausgabenbeleg importieren"
+  short_description: "Belege lesen, Metadaten prüfen und sicher ablegen"
+  default_prompt: "Nutze $beleg-import, um den Beleg aus diesem Pfad zu prüfen und zur Buchung vorzubereiten."

@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eu
+if [ "$(git config --local --get bookkeeping.allowToolCommit || true)" != "true" ]; then
+    echo 'Push im Toolrepo gesperrt; Toolentwicklung erfordert ausdrücklichen Maintainer-Modus.' >&2
+    exit 1
+fi
+if [ -f .venv/Scripts/python.exe ]; then python=.venv/Scripts/python.exe
+elif [ -f .venv/bin/python ]; then python=.venv/bin/python
+else python=python; fi
+exec "$python" -X utf8 scripts/audit_public_repo.py --refs-from-stdin

@@ -1,0 +1,12 @@
+/daten/
+/.venv/
+.env
+.env.*
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+/output/
+/downloads/
+/dashboard.html
+/buchhaltung/

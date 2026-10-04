@@ -1,0 +1,12 @@
+# Buchhaltungswerkzeug
+
+- Mit dem Nutzer auf Deutsch arbeiten. Toolcode und Datenrepo sind unabhängig.
+- Persönliche Daten ausschließlich unter `daten/` verarbeiten. Dieser Ordner ist im Toolrepo vollständig ignoriert und besitzt ein eigenes `.git`; kein Submodul und keine `.gitmodules` anlegen.
+- Vor Daten-Git-Schreibvorgängen die exakte Git-Wurzel, Datenrollenmarkierung und das konfigurierte private Push-Ziel prüfen. Bei fehlendem Datenrepo abbrechen. Nie auf das übergeordnete Repo ausweichen.
+- `.env` und entschlüsselte Schlüssel niemals ausgeben oder committen. Originalbelege, Personenmetadaten und Checkliste nur verschlüsselt speichern; Klartextansichten außerhalb beider Repos erstellen.
+- Die konkreten Buchhaltungsregeln in `daten/AGENTS.md` und `daten/buchhaltung/AGENTS.md` lesen. Eine Migration oder Archivierung ist keine Freigabe für neue Ausgaben, Rechnungsabschlüsse, Zahlungen oder Backend-Änderungen. Entwürfe und abschließende Freigaben getrennt behandeln. Keine Kundenkommunikation ohne explizite Freigabe.
+- Befehle im äußeren Toolordner starten. Helfer liegen in `scripts/`, Daten und Dashboard unter `daten/`. Schreibende lokale Haupt-CLIs verifizieren, committen/pushen ausschließlich das Datenrepo und erstellen einen separaten OTS-Nachweis. Bei Abbruch `publish_bookkeeping.py resume` verwenden; nicht erneut buchen.
+- Im normalen Nutzercheckout sind Toolcommit und Toolpush durch lokale Hooks gesperrt. Toolentwicklung benötigt ausdrücklichen lokalen Maintainer-Modus (`bookkeeping.allowToolCommit=true`); danach wieder deaktivieren. Datenänderungen niemals ins öffentliche Toolrepo aufnehmen.
+- Keine fremden Änderungen zurücksetzen. Migrationen zuerst mit unverändertem Ciphertext prüfen. Bestehende Git-Zeitnachweise über das verschlüsselte historische Bundle weiter verifizieren; alte Hashes nicht umschreiben.
+- Nach Tooländerungen geeignete Tests ausführen, nur allgemeine geprüfte Dateien committen und jeden Commit sofort pushen. Keine persönlichen Beispiele, Dienstendpunkte oder absolute Nutzerpfade in öffentlichen Code oder Dokumentation schreiben.
+- Vor öffentlichen Commits/Pushes `scripts/audit_public_repo.py --staged` beziehungsweise die vollständige Historienprüfung ausführen. Öffentliche Git-Identität aus `bookkeeping.publicName`/`bookkeeping.publicEmail` einhalten; nur GitHub-Noreply-Adressen. Testdaten müssen vollständig künstlich sein. Ein aktueller sauberer Dateibaum genügt nicht, wenn frühere zur Veröffentlichung vorgesehene Commits private Inhalte enthalten.

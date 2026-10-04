@@ -1,0 +1,4 @@
+beautifulsoup4>=4.12
+httpx>=0.25
+python-dotenv>=1.0
+tzdata>=2024.1; platform_system == "Windows"

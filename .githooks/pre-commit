@@ -1,0 +1,17 @@
+#!/bin/sh
+set -eu
+if [ "$(git config --local --get bookkeeping.allowToolCommit || true)" != "true" ]; then
+    echo 'Commit im Toolrepo gesperrt. Buchhaltungscommits gehören ausschließlich nach daten/.' >&2
+    exit 1
+fi
+# Explicit maintainer mode still refuses accidental data or credentials.
+git diff --cached --name-only | while IFS= read -r name; do
+    case "$name" in
+        daten|daten/*|.env|.env.*|buchhaltung/*|dashboard.html|bookkeeping_checklist*|migration/*)
+            echo 'Private Daten im Tool-Index: Commit blockiert.' >&2; exit 1 ;;
+    esac
+done
+if [ -f .venv/Scripts/python.exe ]; then python=.venv/Scripts/python.exe
+elif [ -f .venv/bin/python ]; then python=.venv/bin/python
+else python=python; fi
+"$python" -X utf8 scripts/audit_public_repo.py --staged

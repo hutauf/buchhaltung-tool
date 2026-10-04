@@ -1,0 +1,28 @@
+[project]
+name = "auto-buchhaltung-ebay-invoiz"
+version = "0.1.0"
+description = "Encrypted local bookkeeping, invoice drafts and auditable Git/OpenTimestamps workflows."
+requires-python = ">=3.11"
+dependencies = [
+  "cryptography>=46,<51",
+  "opentimestamps-client==0.7.2",
+  "reportlab>=4.4,<5",
+  "PyMuPDF>=1.26,<2",
+  "filelock>=3.16,<4",
+  "beautifulsoup4>=4.12",
+  "httpx>=0.25",
+  "python-dotenv>=1.0",
+  "tzdata>=2024.1; platform_system == 'Windows'",
+]
+
+[project.scripts]
+buchhaltung = "autobookkeeping.cli:main"
+
+[project.optional-dependencies]
+test = ["pytest>=8", "pypdf>=6,<7"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
