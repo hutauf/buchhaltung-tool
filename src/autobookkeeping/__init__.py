@@ -1,1 +1,1 @@
-"""Agent-driven eBay to invoiz bookkeeping helpers."""
+"""Encrypted local bookkeeping helpers."""

@@ -85,7 +85,7 @@ def projection(catalog: dict, source_digest: str) -> dict:
                 "tax_treatment":tax_treatment,
                 "expense_category":row.get("category") if row.get("kind")=="expense" and row.get("category") in CATEGORIES else None,
                 "coverage":"complete" if row.get("coverage")=="complete" or kind=="draft" else "missing",
-                "source":"invoiz" if row.get("source")=="invoiz" else "local",
+                "source":"local" if row.get("source")=="local" else "imported",
                 "flows":flows,"warnings":sorted(set(warnings)),"document_effect_cents":effect}
         if set(result)!=PUBLIC_ROW_KEYS or any(set(flow)!=PUBLIC_FLOW_KEYS for flow in flows):
             raise ValueError("Dashboard-Schema überschreitet freigegebene Felder")

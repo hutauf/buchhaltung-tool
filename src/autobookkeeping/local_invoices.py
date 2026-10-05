@@ -26,18 +26,6 @@ class WorkflowError(ValueError):
     """Safe error messages contain no credentials or buyer data."""
 
 
-def prevent_invoiz_invoice_write(repo: Path | None = None) -> None:
-    """After the approved handover, the checked-in invoiz helpers stop issuing."""
-    from autobookkeeping.workspace import data_root
-    repo = repo or data_root()
-    archive = Archive(repo)
-    if (archive.root / "database.json.enc").exists():
-        if (repo / "output/local-invoice-transaction.enc").exists():
-            raise WorkflowError("Unterbrochene lokale Transaktion zuerst prüfen")
-        if archive.catalog().get("local_invoice_settings", {}).get("mode") == "local":
-            raise WorkflowError("Nummernvergabe ist lokal übernommen; Invoiz-Rechnungsschreibvorgänge sind gesperrt")
-
-
 def now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -316,12 +304,10 @@ class LocalInvoices:
         config = after.get("local_invoice_settings")
         if not config:
             raise WorkflowError("Absenderprofil zuerst einrichten")
-        if config["mode"] == "trial" and not checks.get("invoiz_checked"):
-            raise WorkflowError("Im Probebetrieb ist die Invoiz-Dublettenprüfung erforderlich")
         if not checks.get("vine_checked") or not checks.get("dhl_checked"):
             raise WorkflowError("DHL- und Vine-Leseprüfungen vor dem Entwurf erforderlich")
         if checks.get("invoice_matches") or checks.get("expense_matches"):
-            raise WorkflowError("Invoiz enthält bereits Rechnung oder Ausgabe für diese Bestellung")
+            raise WorkflowError("Prüfung meldet eine vorhandene Rechnung oder Ausgabe für diese Bestellung")
         snapshot = order_snapshot(order)
         self.check_duplicates(after, snapshot, replacement_of)
         tax = calculate(snapshot["positions"], config["seller"]["small_business"], rates)
@@ -380,7 +366,7 @@ class LocalInvoices:
             result["receipt_gross"] = invoice["receipt_candidate"]["gross"]
         return result
 
-    def activate(self, last_service_number: str, confirmed_live_number: str, approved: bool) -> dict:
+    def activate(self, last_service_number: str, confirmed_live_number: str, approved: bool, reference: dict | None = None) -> dict:
         if not approved:
             raise WorkflowError("Produktivwechsel benötigt ausdrückliche Freigabe")
         self.archive.verify()
@@ -392,6 +378,7 @@ class LocalInvoices:
         if int(last_service_number) != last or last_service_number != confirmed_live_number:
             raise WorkflowError("Nummernstand stimmt nicht; vollständigen Service-Bestand zuerst sichern")
         settings.update(mode="local", last_service_number=last_service_number, activated_at=now())
+        if reference is not None: settings["handover_reference"] = copy.deepcopy(reference)
         after["local_events"] = after.get("local_events", []) + [{"action": "handover", "at": now(), "last_service_number": last_service_number}]
         self.commit(before, after, {})
         return {"ok": True, "mode": "local", "last_service_number": last_service_number}

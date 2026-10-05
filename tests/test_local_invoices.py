@@ -6,7 +6,7 @@ import pytest
 from pypdf import PdfReader
 
 from autobookkeeping.archive import Archive, atomic, encoded
-from autobookkeeping.local_invoices import LocalInvoices, WorkflowError, prevent_invoiz_invoice_write, same_order
+from autobookkeeping.local_invoices import LocalInvoices, WorkflowError, same_order
 from autobookkeeping.models import Address, EbayOrder, EbayOrderItem
 
 
@@ -16,7 +16,7 @@ def workspace(tmp_path):
     (repo / "bookkeeping_checklist.json").write_bytes(encoded({"items": []}))
     archive = Archive(repo, "synthetic-test-password"); archive.init()
     catalog = archive.catalog()
-    catalog["records"]["invoiz:invoice:1"] = {"current": {"kind": "invoice", "number": "0900",
+    catalog["records"]["imported:invoice:1"] = {"current": {"kind": "invoice", "number": "0900",
         "gross": "5.00", "net": "5.00", "vat": "0.00", "vat_rate": 0, "year": "2011", "coverage": "complete",
         "source_record": {"customerData": {"number": "old-order"}}, "documents": []}, "history": []}
     archive.save_catalog(catalog)
@@ -29,7 +29,7 @@ def workspace(tmp_path):
         total_value=13.00, shipping_cost=3.00, currency="EUR", tracking_number="test-tracking",
         shipping_address=Address(name="SYNTHETIC BUYER",street1="Teststraße 1",postal_code="12345",city="Teststadt",country_iso="DE"),
         items=[EbayOrderItem(title="SYNTHETIC DEMO ITEM", price=10.00, item_id="item-1", transaction_id="transaction-1")])
-    checks = {"invoiz_checked": True, "vine_checked": True, "dhl_checked": True, "invoice_matches": [], "expense_matches": []}
+    checks = {"vine_checked": True, "dhl_checked": True, "invoice_matches": [], "expense_matches": []}
     return archive, workflow, order, checks
 
 
@@ -194,32 +194,3 @@ def test_multipage_unicode_and_visible_draft_on_every_page(workspace):
     assert len(pages) >= 3
     assert all("TESTENTWURF" in page.extract_text() and "Steuernummer" in page.extract_text() for page in pages)
     assert "Übergrößen" in pages[0].extract_text()
-
-
-def test_handover_stops_old_service_helpers(workspace, monkeypatch):
-    archive, workflow, order, checks = workspace
-    # Use the fixture password instead of reading any real environment file.
-    monkeypatch.setattr("autobookkeeping.local_invoices.Archive", lambda repo: archive)
-    prevent_invoiz_invoice_write(archive.repo)
-    workflow.activate("0900","0900",True)
-    with pytest.raises(WorkflowError):
-        prevent_invoiz_invoice_write(archive.repo)
-
-
-def test_service_number_scan_paginates_and_retains_cancelled_numbers():
-    import runpy
-    from pathlib import Path
-    service_numbers = runpy.run_path(str(Path(__file__).parents[1] / "scripts/local_invoice.py"))["service_numbers"]
-    rows = [{"id":i,"number":str(250+i).zfill(4),"state":"paid"} for i in range(25)]
-    rows[0].update(number="0911",state="cancelled")
-    rows.append({"id":99,"number":None,"state":"draft"})
-    class Client:
-        def list_invoices(self,limit,offset):
-            return {"data":rows[offset:offset+limit]}
-    result=service_numbers(Client())
-    assert result["last_number"] == "0911" and result["rows"] == 26 and result["unfinalized"] == 1
-    class BrokenClient:
-        def list_invoices(self,limit,offset):
-            return {"data":rows[:20]}
-    with pytest.raises(WorkflowError):
-        service_numbers(BrokenClient())

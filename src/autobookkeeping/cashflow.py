@@ -46,7 +46,7 @@ def document_flows(catalog: dict, row: dict) -> tuple[list[dict], list[str]]:
         return flows,warnings
     kind=row["kind"]
     if kind=="invoice":
-        if row.get("source")=="invoiz":
+        if row.get("source") != "local":
             detail=row.get("source_detail") or {}
             seen=set()
             for payment in detail.get("payments",[]):
@@ -55,7 +55,7 @@ def document_flows(catalog: dict, row: dict) -> tuple[list[dict], list[str]]:
                     warnings.append("Unklare oder doppelte Zahlung in Quelldaten")
                     continue
                 seen.add(pid)
-                append(payment.get("amount"),payment.get("date"),pid,"invoiz","income")
+                append(payment.get("amount"),payment.get("date"),pid,"imported","income")
             if not flows:
                 warnings.append("Kein verwertbarer Zahlungseintrag")
             if row.get("status")=="cancelled":

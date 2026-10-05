@@ -13,7 +13,7 @@ SCRIPT=runpy.run_path(str(ROOT/"scripts/build_bookkeeping_dashboard.py"))
 
 
 def row():
-    return {"id":"opaque-1","kind":"invoice","source":"invoiz","date":"2011-01-02","status":"paid",
+    return {"id":"opaque-1","kind":"invoice","source":"imported","date":"2011-01-02","status":"paid",
             "number":"0001","gross":"119.00","net":"100.00","vat":"19.00","vat_rate":19,"year":"2011",
             "coverage":"complete","documents":[],"source_detail":{"payments":[{"id":1,"type":"payment","amount":119,"date":"2011-01-03T12:00:00Z"}]},
             "buyer":{"name":"PRIVATE <script>SECRET</script>"},"description":"PRIVATE PRODUCT", "order_id":"PRIVATE ORDER"}

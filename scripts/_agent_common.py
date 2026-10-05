@@ -22,4 +22,4 @@ def fail(message: str, code: int = 1) -> None:
 
 
 from autobookkeeping.workspace import data_root
-ROOT = data_root()
+ROOT = TOOL / "daten"

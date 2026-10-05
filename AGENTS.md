@@ -1,6 +1,8 @@
 # Buchhaltungswerkzeug
 
 - Mit dem Nutzer auf Deutsch arbeiten. Toolcode und Datenrepo sind unabhängig.
+- Keine Clients, Zugangskonfiguration, Importadapter oder Schreibskripte für frühere Rechnungsdienste in dieses Toolrepo aufnehmen. Historische importierte Belege dienstunabhängig im Speicher lesen; deren verschlüsselte Quellkennungen und Originale nicht umschreiben. `buchhaltung` startet ausschließlich die lokalen Helfer.
+- Neue Profile lokal aus einer geprüften externen Profildatei einrichten. Nummernübergaben aus einem geprüften lokalen Übergabebericht lesen; vollständigen Bestand, keine offenen externen Entwürfe, Nummernstand und Ende der externen Nummernvergabe ausdrücklich prüfen. Produktivwechsel und konkrete Rechnungsfreigabe bleiben getrennt.
 - Persönliche Daten ausschließlich unter `daten/` verarbeiten. Dieser Ordner ist im Toolrepo vollständig ignoriert und besitzt ein eigenes `.git`; kein Submodul und keine `.gitmodules` anlegen.
 - Vor Daten-Git-Schreibvorgängen die exakte Git-Wurzel, Datenrollenmarkierung und das konfigurierte private Push-Ziel prüfen. Bei fehlendem Datenrepo abbrechen. Nie auf das übergeordnete Repo ausweichen.
 - `.env` und entschlüsselte Schlüssel niemals ausgeben oder committen. Originalbelege, Personenmetadaten und Checkliste nur verschlüsselt speichern; Klartextansichten außerhalb beider Repos erstellen.

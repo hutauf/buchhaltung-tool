@@ -25,42 +25,32 @@ def test_authenticated_encryption_and_wrapping():
         unseal(key, cipher, "wrong-path")
 
 
-def fixture_backup(root: Path):
-    source = root / "source"
-    file = source / "Rechnungen/2011/invoice.pdf"
-    file.parent.mkdir(parents=True)
-    file.write_bytes(b"%PDF-1.4 private buyer")
-    meta = file.parent / "Metadaten/invoice.json"
-    meta.parent.mkdir()
-    meta.write_bytes(encoded({"id": 1, "number": "0001", "date": "2011-10-01", "state": "paid", "totalGross": 119, "totalNet": 100, "customerData": {"name": "PRIVATE NAME"}}))
-    (source / "Ausgaben").mkdir()
-    manifest = {"last_run": {"id": "run-1", "started_at": "2011-01-01T00:00:00+00:00", "status": "complete", "stats": {"invoice_records": 1, "expense_records": 0}},
-                "downloads": {"i1": {"status": "complete", "kind": "invoice_pdf", "source_id": "1", "relative_path": "Rechnungen/2011/invoice.pdf", "last_seen_at": "2011-10-03T00:00:00+00:00", "size": file.stat().st_size, "sha256": sha(file.read_bytes())}}}
-    (source / "manifest.json").write_bytes(encoded(manifest))
-    return source, meta, file
+def fixture_document(root: Path):
+    source = root / "source"; source.mkdir()
+    pdf = source / "invoice.pdf"; pdf.write_bytes(b"%PDF-1.4 private buyer")
+    meta = source / "metadata.json"
+    meta.write_bytes(encoded({"source":"imported","source_id":"1","kind":"invoice","number":"0001", "date":"2011-10-01", "status":"paid", "currency":"EUR", "gross":"119.00", "net":"100.00", "vat":"19.00", "vat_rate":19, "buyer":{"name":"PRIVATE NAME"}}))
+    return source, meta, pdf
 
 
-def test_import_idempotence_versions_and_tampering(tmp_path):
-    repo = tmp_path / "repo"
-    repo.mkdir()
-    (repo / "bookkeeping_checklist.json").write_text('{"items": []}')
+def test_import_idempotence_immutable_original_and_tampering(tmp_path):
+    repo = tmp_path / "repo"; repo.mkdir()
     archive = Archive(repo, "test-password")
-    source, meta, pdf = fixture_backup(tmp_path)
-    assert archive.import_invoiz(source)["invoice"] == 1
+    source, meta, pdf = fixture_document(tmp_path)
+    assert archive.import_local(meta, [pdf])["changed"]
     assert archive.verify()["documents"] == 1
     before = {p: p.read_bytes() for p in archive.root.rglob("*") if p.is_file()}
-    assert archive.import_invoiz(source)["changed"] == 0
+    assert not archive.import_local(meta, [pdf])["changed"]
     assert all(p.read_bytes() == value for p, value in before.items())
     assert b"PRIVATE NAME" not in b"".join(before.values())
-    row = archive.catalog()["records"]["invoiz:invoice:1"]["current"]
-    assert row["gross"] == "119.00" and row["vat"] == "19.00" and row["vat_rate"] is None
-    raw = json.loads(meta.read_bytes()); raw["totalGross"] = 120; meta.write_bytes(encoded(raw))
-    archive.import_invoiz(source)
-    assert len(archive.catalog()["records"]["invoiz:invoice:1"]["history"]) == 1
+    row = archive.catalog()["records"]["imported:invoice:1"]["current"]
+    assert row["gross"] == "119.00" and row["vat"] == "19.00" and row["vat_rate"] == 19
+    raw = json.loads(meta.read_bytes()); raw.update(gross="120.00", net="101.00"); meta.write_bytes(encoded(raw))
+    with pytest.raises(ValueError): archive.import_local(meta, [pdf])
+    assert archive.catalog()["records"]["imported:invoice:1"]["current"] == row
     path = archive.root / row["documents"][0]
     path.write_bytes(path.read_bytes()[:-1] + b"!")
-    with pytest.raises(ValueError):
-        archive.verify()
+    with pytest.raises(ValueError): archive.verify()
 
 
 def test_outside_and_traversal_and_lost_key(tmp_path):
@@ -127,8 +117,8 @@ def test_export_only_outside_repo_and_original_pdf(tmp_path):
     scripts = repo / "scripts"; scripts.mkdir()
     (scripts / "archive_view.html").write_bytes(b"<!doctype html>view")
     (repo / "bookkeeping_checklist.json").write_text('{"items": []}')
-    source, meta, pdf = fixture_backup(tmp_path)
-    archive = Archive(repo, "test-password"); archive.import_invoiz(source)
+    source, meta, pdf = fixture_document(tmp_path)
+    archive = Archive(repo, "test-password"); archive.import_local(meta, [pdf])
     with pytest.raises(ValueError):
         archive.export(repo / "output")
     target = tmp_path / "view"

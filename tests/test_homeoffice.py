@@ -63,7 +63,7 @@ def test_approval_encryption_replacement_history_and_no_cash(workflow):
 def test_annual_reporting_by_payment_year_and_no_double_expense(workflow):
     archive = workflow.archive; catalog = archive.catalog()
     catalog["records"] = {
-        "income": {"current": {"id": "income", "kind": "invoice", "source": "invoiz", "year": "2025",
+        "income": {"current": {"id": "income", "kind": "invoice", "source": "imported", "year": "2025",
             "status": "paid", "gross": "1000.00", "net": "1000.00", "vat": "0.00", "documents": [], "coverage": "complete",
             "source_detail": {"payments": [{"id": 1, "type": "payment", "amount": "1000.00", "date": "2026-01-01"}]}}, "history": []},
         "expense": {"current": {"id": "expense", "kind": "expense", "year": "2026", "status": "recorded", "gross": "100.00",

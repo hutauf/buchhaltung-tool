@@ -16,7 +16,7 @@ py -m venv .venv
 .venv\Scripts\python.exe -X utf8 scripts\setup_workspace.py --data-url 'git@github.com:DEIN_KONTO/DEIN_PRIVATES_DATENREPO.git'
 ```
 
-In `daten/.env` lokal `ENCRYPTION_PASSWORD` hinterlegen. Optional benötigte eBay-, Invoiz-, GMX- und Vine-Zugangswerte ebenfalls dort konfigurieren; nichts davon committen. Git-Autor im privaten Repo konfigurieren. Vor dem ersten Archiv-CLI muss dort ein initialer Commit mit Rollenmarkierung und Konfiguration existieren und nach `origin/main` gepusht sein:
+In `daten/.env` lokal `ENCRYPTION_PASSWORD` hinterlegen. Optional benötigte eBay-, GMX- und Vine-Zugangswerte ebenfalls dort konfigurieren; nichts davon committen. Git-Autor im privaten Repo konfigurieren. Vor dem ersten Archiv-CLI muss dort ein initialer Commit mit Rollenmarkierung und Konfiguration existieren und nach `origin/main` gepusht sein:
 
 ```powershell
 git -C daten add .bookkeeping-data.json .gitignore .gitattributes workspace.json AGENTS.md buchhaltung
@@ -28,6 +28,21 @@ git -C daten push -u origin main
 `init` erzeugt eine leere verschlüsselte Ablage samt vollständiger Veröffentlichung. Vorhandene Daten nicht neu initialisieren oder Schlüssel ersetzen. Auch dieses Toolrepo muss einen sauberen eingecheckten Stand besitzen; bei einem normalen Klon ist das bereits der Fall.
 
 ## Bedienung
+
+`buchhaltung` ist der gemeinsame lokale Einstieg. Nach Installation steht der Befehl in `.venv/Scripts/`; alternativ funktioniert `.venv\Scripts\python.exe -X utf8 -m autobookkeeping.cli`. Die vorhandenen Helferskripte bleiben für Automatisierung und Wiederaufnahme verfügbar.
+
+```powershell
+.venv\Scripts\buchhaltung.exe --help
+.venv\Scripts\buchhaltung.exe rechnung list
+.venv\Scripts\buchhaltung.exe beleg inspect 'PFAD_ZUM_BELEG'
+.venv\Scripts\buchhaltung.exe zahlung erfassen --metadata 'GEPRUEFTE_ZAHLUNG.json' --approved
+.venv\Scripts\buchhaltung.exe pruefen
+.venv\Scripts\buchhaltung.exe dashboard
+.venv\Scripts\buchhaltung.exe sicherung export --output 'NEUER_ORDNER_AUSSERHALB'
+.venv\Scripts\buchhaltung.exe veroeffentlichen status
+```
+
+Dieser Toolstand enthält keine Anbindung an einen externen Rechnungsdienst. Historische Quellkennungen bleiben unverändert in der privaten verschlüsselten Ablage; vorhandene Positionen und Zahlungen werden lokal ausgewertet. Exporte aus alten Diensten vorbereiten und prüfen, bevor sie als lokale Originalbelege importiert werden. Ein Import stellt keine neue Rechnung aus.
 
 Alle Befehle im **äußeren Toolordner** ausführen:
 
@@ -43,6 +58,18 @@ Alle Befehle im **äußeren Toolordner** ausführen:
 ```
 
 `daten/dashboard.html` per Doppelklick öffnen. Die statische Seite zeigt für Änderungen passende CLI-Befehle. Homeoffice hat 210 Tage als Eingabevorgabe, keinen automatisch gebuchten Jahresansatz. Belege und Metadaten vor einer konkreten Buchungsfreigabe prüfen. Lokale Rechnungen starten im Probebetrieb; der Produktivwechsel und die fortlaufende Nummernübernahme verlangen eine gesonderte Freigabe.
+
+## Lokales Rechnungsprofil und Nummernübergabe
+
+Ein neuer Workspace erhält sein Absenderprofil mit `buchhaltung rechnung configure --profile PROFIL_JSON_AUSSERHALB --last-number 0000`. Die Profildatei enthält `name`, `street`, `postal_code`, `city`, `country_iso`, `tax_number`, `small_business`, `tax_note` und `introduction`. Das vorhandene Profil nicht neu initialisieren. Der geprüfte Nummernstand muss mit dem Archiv übereinstimmen; bei einem neuen leeren Bestand ist er `0000`.
+
+Die Aktivierung liest einen zuvor geprüften lokalen Übergabebericht außerhalb beider Repos. Er enthält `version: 1`, `last_number` als numerischen Text, `inventory_complete: true`, `unfinalized: 0`, `external_numbering_stopped: true` und eine konkrete `verification_basis`. Diese Angaben sind ausdrücklich zu prüfen; ein Bericht beweist nicht selbst die Vollständigkeit eines früheren Dienstes. Erst nach gesonderter Freigabe:
+
+```powershell
+.venv\Scripts\buchhaltung.exe rechnung activate --last-number GEPRUEFTE_NUMMER --handover 'UEBERGABEBERICHT_AUSSERHALB.json' --approved
+```
+
+Der Bericht wird mit Prüfbasis und SHA256 verschlüsselt als Übergabenachweis gespeichert. Vorbereitung, lokale Dublettenprüfung und Aktivierung benötigen keinen Zugriff auf einen früheren Rechnungsdienst. eBay/DHL/Vine-Abfragen für den eBay-Ablauf bleiben erhalten; sie senden keine Rechnung. Aktivierung und das Abschließen eines konkreten Entwurfs bleiben getrennte Freigaben.
 
 Schreibende Haupt-CLIs prüfen zuerst Datenrolle, exakte Git-Wurzel, privaten Remote und eine saubere veröffentlichte Toolversion. Danach laufen Archivprüfung, Dashboard, Datencommit/Push und ein separater OTS-Commit/Push im privaten Repo. Dessen `tool-version.json` hält den verwendeten Code-Commit fest. Ein OTS-Kalendernachweis ist zunächst ausstehend; `confirm` holt spätere Bitcoin-Bestätigungen nach und veröffentlicht geänderte Nachweise. Keine Geldbewegung oder E-Mail wird dadurch ausgeführt.
 

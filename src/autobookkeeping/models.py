@@ -66,16 +66,3 @@ class DhlMailCandidate:
     date: str
     tracking_numbers: list[str] = field(default_factory=list)
     links: list[str] = field(default_factory=list)
-
-
-@dataclass(slots=True)
-class InvoiceDraft:
-    order_id: str
-    payload: dict
-
-
-@dataclass(slots=True)
-class ExpenseDraft:
-    order_id: str
-    payload: dict
-    receipt_path: Path | None = None

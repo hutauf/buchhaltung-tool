@@ -9,7 +9,7 @@ from pathlib import Path
 TOOL = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(TOOL / "src"))
 from autobookkeeping.workspace import data_root
-ROOT = data_root()
+ROOT = TOOL / "daten"
 from filelock import FileLock
 from autobookkeeping.archive import Archive
 from autobookkeeping.homeoffice import calculate, record, public_allowances, eur_summary, DEFAULT_DAYS
@@ -32,6 +32,7 @@ def main():
     sub.add_parser("list")
     p = sub.add_parser("report"); p.add_argument("--year", type=int)
     args = parser.parse_args()
+    data_root()
     if getattr(args, "snapshot", None):
         if not re.fullmatch(r"[a-f0-9]{64}", args.snapshot): raise WorkflowError("Ungültiger Dashboard-Snapshot")
         os.environ["BOOKKEEPING_EXPECTED_SNAPSHOT"] = args.snapshot

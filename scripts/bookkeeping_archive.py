@@ -12,7 +12,7 @@ from filelock import FileLock
 TOOL = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(TOOL / "src"))
 from autobookkeeping.workspace import data_root
-ROOT = data_root()
+ROOT = TOOL / "daten"
 from autobookkeeping.publication import Publication
 from autobookkeeping.archive import Archive, atomic, cd_export, cd_verify, checkpoint, outside, unseal, verify_checkpoint
 
@@ -21,13 +21,10 @@ def arguments():
     parser = argparse.ArgumentParser(description="Verschlüsselte Buchhaltungsablage")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("init")
-    p = sub.add_parser("import-invoiz")
-    p.add_argument("--source", type=Path, required=True)
     p = sub.add_parser("import-local")
     p.add_argument("--metadata", type=Path, required=True)
     p.add_argument("--pdf", type=Path, action="append", required=True)
     sub.add_parser("verify")
-    sub.add_parser("enrich-invoiz")
     p = sub.add_parser("report")
     p.add_argument("--year")
     p = sub.add_parser("export")
@@ -55,15 +52,10 @@ def run(args):
     if args.command == "init":
         archive.init()
         result = {"ok": True}
-    elif args.command == "import-invoiz":
-        result = archive.import_invoiz(args.source)
-        archive.verify()
     elif args.command == "import-local":
         result = archive.import_local(args.metadata, args.pdf)
     elif args.command == "verify":
         result = archive.verify()
-    elif args.command == "enrich-invoiz":
-        result = archive.enrich_invoiz()
 
     elif args.command == "report":
         result = archive.report(args.year)
@@ -130,10 +122,11 @@ def run(args):
 
 
 def main() -> int:
-    (ROOT / "output").mkdir(exist_ok=True)
     args = arguments()
+    data_root()
+    (ROOT / "output").mkdir(exist_ok=True)
     proof_write = args.command == "stamp" or args.command == "timestamps" and args.action == "upgrade"
-    writes = proof_write or args.command in ("init", "import-invoiz", "import-local", "enrich-invoiz")
+    writes = proof_write or args.command in ("init", "import-local")
     with Publication(ROOT, "archive " + args.command, enabled=writes, mode="proofs" if proof_write else "data") as publication:
         with FileLock(ROOT / "output/archive.lock", timeout=0):
             if (ROOT / "output/local-invoice-transaction.enc").exists():

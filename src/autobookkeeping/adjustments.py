@@ -33,7 +33,7 @@ def original_view(catalog: dict, invoice_id: str) -> dict:
         raise WorkflowError("Nur ausgestellte, noch nicht im Quellsystem stornierte Originalrechnungen verwenden")
     if row.get("currency", "EUR") != "EUR":
         raise WorkflowError("Rechnungskorrekturen derzeit nur in EUR")
-    if row.get("source") == "invoiz":
+    if row.get("source") != "local" and not row.get("positions"):
         detail = row.get("source_detail")
         if not detail:
             raise WorkflowError("Vollständige Originalpositionen zuerst importieren")

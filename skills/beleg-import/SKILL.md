@@ -45,7 +45,7 @@ Nach Freigabe nur die angezeigte unveränderte Revision buchen:
 .venv\Scripts\python.exe -X utf8 scripts\receipt.py book BELEG_ENTWURF_ID --revision FREIGEGEBENE_SHA256 --approved
 ```
 
-Der Helfer prüft Original, Metadaten und Dubletten erneut, schreibt die Ausgabe und liest die verschlüsselte Transaktion zurück. Er führt keine Zahlung aus und schreibt weder Invoiz/Norman noch Vine. Bei unterbrochener Transaktion ausschließlich den vorhandenen `local_invoice.py recover`-Ablauf verwenden.
+Der Helfer prüft Original, Metadaten und Dubletten erneut, schreibt die Ausgabe und liest die verschlüsselte Transaktion zurück. Er führt keine Zahlung aus und schreibt keinen externen Buchhaltungsdienst oder Vine. Bei unterbrochener Transaktion ausschließlich den vorhandenen `local_invoice.py recover`-Ablauf verwenden.
 
 Die schreibenden Helfer (`prepare`, `book`, `discard`) prüfen das Archiv, erzeugen das Dashboard, committen/pushen den Datenstand und erstellen/committen/pushen seinen separaten OTS-Nachweis automatisch. Erfolgreiches Ergebnis unter `publication` prüfen; keine zweite manuelle Commit-/Stamp-Kette starten. Bei Abbruch `publish_bookkeeping.py status` lesen und ausschließlich `publish_bookkeeping.py resume` verwenden; es stellt auch das verschlüsselte Transaktionsjournal wieder her. Die Buchung nicht wiederholen. Bitcoin-Bestätigung bleibt zunächst ausstehend; mit `publish_bookkeeping.py confirm` später aktualisieren, prüfen und automatisch pushen. Externe Prüfkopien sind sensible Klartextdaten: ihren Pfad nennen und nicht in Git aufnehmen. Keine anderen Nutzerdateien löschen.
 

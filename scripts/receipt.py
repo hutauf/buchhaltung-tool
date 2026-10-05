@@ -9,7 +9,7 @@ from pathlib import Path
 TOOL = Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(TOOL/"src"))
 from autobookkeeping.workspace import data_root
-ROOT = data_root()
+ROOT = TOOL / "daten"
 from filelock import FileLock
 from autobookkeeping.publication import Publication
 from autobookkeeping.archive import Archive
@@ -29,13 +29,13 @@ def main():
     p=sub.add_parser("book",help="Genau die freigegebene Metadatenrevision als Ausgabe buchen")
     p.add_argument("id");p.add_argument("--revision",required=True);p.add_argument("--approved",action="store_true")
     p=sub.add_parser("discard");p.add_argument("id")
-    args=parser.parse_args();(ROOT/"output").mkdir(exist_ok=True)
+    args=parser.parse_args();data_root();(ROOT/"output").mkdir(exist_ok=True)
     with Publication(ROOT, "receipt " + args.command, enabled=args.command in ['prepare', 'book', 'discard']) as publication:
         with FileLock(ROOT/"output/archive.lock",timeout=0):
             workflow=LocalInvoices(Archive(ROOT));receipts=Receipts(workflow)
             if workflow.journal.exists():raise WorkflowError("Offene Archivtransaktion zuerst mit local_invoice.py recover abschließen")
             if args.command=="inspect":
-                base=Path(os.environ.get("LOCALAPPDATA") or Path.home()/".cache")/"AutoBuchhaltungEbayInvoiz"/"belegpruefung"
+                base=Path(os.environ.get("LOCALAPPDATA") or Path.home()/".cache")/"BuchhaltungTool"/"belegpruefung"
                 target=args.output or base/uuid.uuid4().hex
                 result=receipts.inspect(args.path,target)
             elif args.command=="prepare":result=receipts.prepare(args.review,args.metadata)

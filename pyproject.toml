@@ -1,5 +1,5 @@
 [project]
-name = "auto-buchhaltung-ebay-invoiz"
+name = "buchhaltung-tool"
 version = "0.1.0"
 description = "Encrypted local bookkeeping, invoice drafts and auditable Git/OpenTimestamps workflows."
 requires-python = ">=3.11"

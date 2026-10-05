@@ -87,8 +87,8 @@ def test_cash_override_replaces_source_and_privacy_allowlist(workspace):
     archive,workflow,order,checks=workspace; invoice=issued(workspace)
     payload={"record_id":invoice["id"],"amount":"13.00","date":"2011-10-04","external_reference":"PRIVATE BANK REFERENCE","evidence":"PRIVATE EVIDENCE","source_complete":True}
     record_cash(workflow,payload,True)
-    catalog=archive.catalog(); old=catalog["records"]["invoiz:invoice:1"]["current"]
-    old.update(id="invoiz:invoice:1",source="invoiz",date="2011-01-01",status="paid")
+    catalog=archive.catalog(); old=catalog["records"]["imported:invoice:1"]["current"]
+    old.update(id="imported:invoice:1",source="imported",date="2011-01-01",status="paid")
     snapshot=projection(catalog,"0"*64)
     data=html(snapshot,b'<script type="application/json">__BOOKKEEPING_DATA__</script>')
     assert sum(f["amount_cents"] for r in snapshot["rows"] if r["number"]=="0901" for f in r["flows"])==1300
@@ -99,9 +99,27 @@ def test_cash_override_replaces_source_and_privacy_allowlist(workspace):
 
 
 def test_source_payment_day_stornos_remain_flagged():
-    row={"id":"source-1","kind":"invoice","source":"invoiz","status":"cancelled","source_detail":{"payments":[
+    row={"id":"source-1","kind":"invoice","source":"imported","status":"cancelled","source_detail":{"payments":[
         {"id":1,"type":"payment","amount":10,"date":"2011-08-22T22:59:00Z","cancellationPaymentId":2},
         {"id":2,"type":"payment","amount":-10,"date":"2012-01-02T11:00:00Z","cancellationPaymentId":1}]}}
     flows,warnings=document_flows({},row)
     assert [f["date"] for f in flows]==["2011-08-23","2012-01-02"] and sum(f["amount_cents"] for f in flows)==0
     assert len(warnings)==2
+
+
+def test_imported_original_positions_are_read_locally_without_provider(workspace):
+    from autobookkeeping.adjustments import original_view
+    archive,workflow,order,checks=workspace
+    invoice=issued(workspace);catalog=archive.catalog()
+    row=catalog['records'][invoice['id']]['current']
+    positions=row.pop('positions')
+    row['source']='synthetic_external_export'
+    row['source_detail']={'customerData':{'name':row['buyer']['name'],'street':row['buyer']['street'],
+        'zipCode':row['buyer']['postal_code'],'city':row['buyer']['city'],'countryIso':'DE'},
+        'smallBusiness':True,'date':row['date'],'positions':[
+            {'title':p['title'],'amount':p['quantity'],'unit':p['unit'],
+             'priceGrossAfterDiscount':p['unit_gross'],'totalGrossAfterDiscount':p['gross'],
+             'totalNetAfterDiscount':p['net'],'vatPercent':p['vat_rate']} for p in positions]}
+    view=original_view(catalog,invoice['id'])
+    assert view['gross']==row['gross'] and view['buyer']==row['buyer']
+    assert [p['gross'] for p in view['positions']]==[p['gross'] for p in positions]

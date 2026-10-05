@@ -8,7 +8,7 @@ from pathlib import Path
 TOOL = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(TOOL / "src"))
 from autobookkeeping.workspace import data_root
-ROOT = data_root()
+ROOT = TOOL / "daten"
 from autobookkeeping.archive import verify_checkpoint
 from autobookkeeping.publication import resume, Publication
 from autobookkeeping.timestamps import verify_public, status
@@ -36,6 +36,7 @@ def confirm():
 def main():
     parser = argparse.ArgumentParser(description="Buchhaltungs-Veröffentlichung und Bitcoin-Bestätigung")
     parser.add_argument("command", choices=("resume", "status", "confirm")); args = parser.parse_args()
+    data_root()
     if args.command == "resume": result = resume(ROOT)
     elif args.command == "confirm": result = confirm()
     else:

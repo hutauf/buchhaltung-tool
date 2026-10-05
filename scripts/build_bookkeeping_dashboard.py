@@ -16,7 +16,7 @@ CODE = ["scripts/build_bookkeeping_dashboard.py", "scripts/dashboard_view.html",
         "scripts/bookkeeping_action.py", "scripts/publish_bookkeeping.py", "scripts/homeoffice.py",
         "scripts/receipt.py", "scripts/local_invoice.py", "scripts/bookkeeping_archive.py",
         *["src/autobookkeeping/"+name+".py" for name in
-          ("__init__", "workspace", "archive", "checklist", "dashboard", "adjustments", "cashflow", "local_invoices", "taxes", "ledger_validation", "receipts", "homeoffice", "publication", "timestamps", "models")]]
+          ("__init__", "workspace", "archive", "checklist", "handover", "dashboard", "adjustments", "cashflow", "local_invoices", "taxes", "ledger_validation", "receipts", "homeoffice", "publication", "timestamps", "models")]]
 
 
 def git(repo, *args):
@@ -69,10 +69,9 @@ def build(repo: Path, staged=False, check=False, tool=None):
 
 
 def main():
-    ROOT = data_root()
     parser = argparse.ArgumentParser(description="Anonymisierte Offline-Bestandsübersicht erzeugen")
     parser.add_argument("--staged", action="store_true"); parser.add_argument("--check", action="store_true")
-    args = parser.parse_args(); (ROOT / "output").mkdir(exist_ok=True)
+    args = parser.parse_args(); ROOT = data_root(); (ROOT / "output").mkdir(exist_ok=True)
     with FileLock(ROOT / "output/archive.lock", timeout=0):
         result = build(ROOT, args.staged, args.check)
     print("Dashboard: " + ("keine relevanten Änderungen" if result.get("skipped") else str(result["rows"])+" Belege · "+result["output"]))
