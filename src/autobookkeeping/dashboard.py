@@ -160,4 +160,6 @@ def index_catalog(repo:Path)->tuple[dict,str]:
             raise ValueError('Gestagter Zusatznachweis verweist auf fehlendes Original')
     from autobookkeeping.ledger_validation import validate
     validate(catalog)
+    from autobookkeeping.audit_trail import validate as validate_trail
+    validate_trail(catalog)
     return catalog,sha(database)

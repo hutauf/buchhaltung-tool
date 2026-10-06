@@ -245,6 +245,7 @@ class LocalInvoices:
             raise WorkflowError("Offene Transaktion zuerst mit recover abschließen")
         if sha(encoded(self.archive.catalog())) != sha(encoded(before)):
             raise WorkflowError("Datenbank wurde gleichzeitig geändert")
+        self.archive.prepare_catalog(after)
         transaction = {"before_sha256": sha(encoded(before)), "after": after,
                        "documents": {name: base64.b64encode(data).decode() for name, data in documents.items()}}
         atomic(self.journal, seal(self.archive.unlock(), encoded(transaction), "local-invoice-transaction"))

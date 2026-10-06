@@ -1,6 +1,6 @@
 # Verfahrensdokumentation der lokalen Belegablage
 
-Version 1 · Regelstand geprüft am 06.10.2026. Änderungen dieser Beschreibung werden mit der Toolhistorie versioniert. Die im privaten Workspace verwendete Toolrevision steht in `tool-version.json`.
+Version 2 · Regelstand geprüft am 06.10.2026. Änderungen dieser Beschreibung werden mit der Toolhistorie versioniert. Die im privaten Workspace verwendete Toolrevision steht in `tool-version.json`.
 
 ## 1. Allgemeine Beschreibung
 
@@ -17,11 +17,11 @@ Diese öffentliche Beschreibung erklärt die vorhandenen Mechanismen. Sie bestä
 | Richtigkeit | Summen, Steuergruppen, Dubletten und freigegebene Revision prüfen; XML lokal validieren | Betrieblicher Bezug, Quellenrichtigkeit und Sondersteuern manuell prüfen |
 | Zeitgerechte Erfassung | Vorbereitung und Abschluss getrennt, Datum und Ereignisse erfasst | Eingangskontrolle und Erfassungstakt privat verbindlich festlegen |
 | Ordnung/Belegfunktion | Jahr, Dokumentart, eindeutiger Kontext, Verknüpfung zu Zahlungen/Korrekturen | Fehlende Originale im Altbestand bleiben als Lücke sichtbar |
-| Unveränderbarkeit | Abschlüsse erzeugen neue Originale; Korrekturbelege statt Überschreiben; Git plus externe Zeitnachweise | Kein WORM-Speicher; Administrator kann Historie verändern/löschen. Aufbewahrung alter Nachweise und unabhängige Sicherung nötig |
-| Internes Kontrollsystem | Freigaberevisionen, Rückleseprüfung, Integritätsprüfung, Pipelinezustand | Nutzer muss Quellenabgleich, Fehlerbehandlung und Kontrollen dokumentieren |
+| Unveränderbarkeit | Neue Originale statt Überschreiben; zentrale Original-/Inventarsperre; verschlüsseltes Katalogänderungsprotokoll plus Git/OTS | Kein WORM-Speicher; Administrator kann Historie verändern/löschen. Aufbewahrung alter Nachweise und unabhängige Sicherung nötig |
+| Internes Kontrollsystem | Freigaberevisionen, Rückleseprüfung, Integritätsprüfung und gespeicherter technischer Kontrollnachweis vor Datenveröffentlichung | Nutzer muss Quellenabgleich, Fehlerbehandlung und betriebliche Kontrollen dokumentieren |
 | Datensicherheit | Verschlüsselung und Trennung von Code/Daten, keine Klartextoriginale in Git | Passwort-/Zugriffsverwaltung, Datenträger und Wiederherstellung privat festlegen |
 | Aufbewahrung | Elfjährige Mindestpolitik, keine automatische Löschung, Originalformate erhalten | Verlängerungen prüfen; Fristprüfung allein erlaubt keine Löschung |
-| Lesbarkeit/Auswertbarkeit | Entschlüsselung außerhalb, vollständiger JSON-Katalog, XML-/PDF-Originale und Belegansicht | Prüfexport und erforderliche Auswertungen mit Prüfer abstimmen; kein zugesicherter IDEA-Import |
+| Lesbarkeit/Auswertbarkeit | Entschlüsselung außerhalb, vollständiger JSON-/CSV-Katalog, Feldtypen/Verknüpfungen, XML-/PDF-Originale und Belegansicht | Prüfexport und erforderliche Auswertungen mit Prüfer abstimmen; kein zugesicherter IDEA-Import |
 | Systemwechsel | Beide Git-Bundles, Archiv und versiegelte Migrationshistorie in CD-Export | Tatsächlichen Restore erproben; Quellenvollständigkeit vor Übergabe prüfen |
 | Verfahrensdokumentation | Diese vierteilige Beschreibung, private Ergänzung und Versionshistorie | Betriebsangaben und durchgeführte Kontrollen dürfen nicht durch Vorlagen ersetzt werden |
 
@@ -59,6 +59,16 @@ Das Manifest enthält Ciphertext-Prüfsummen und Größen. Der verschlüsselte K
 
 Lokale Transaktionen besitzen ein verschlüsseltes Wiederherstellungsjournal. Der Veröffentlichungsprozess besitzt einen separaten Zustandsautomaten und eine Sperre. Bei Unterbrechung wird die bereits autorisierte Transaktion fortgesetzt. Keine konkurrierenden Buchungen oder manuelles Löschen des Journals.
 
+### Änderungs- und Verarbeitungsprotokolle
+
+Jeder über den Kataloghelfer gespeicherte Datenbankwechsel ergänzt `audit_trail` innerhalb des verschlüsselten Katalogs. Ein Eintrag hält UTC-Erfassungszeit, technische Schreiberkennung `local-helper`, Tool-Gitrevision, vorherigen/nachfolgenden Kataloghash und Änderungen mit Pfad sowie Vorher-/Nachher-Werten fest. Die Einträge sind fortlaufend nummeriert und über SHA256 verkettet. Die Archiv- und Indexprüfung rekonstruiert den Stand aus Ausgangsbestand und Änderungen; Kürzung, veränderte Einträge oder Abweichungen zum aktuellen Katalog werden beanstandet. Das Transaktionsjournal enthält bereits den vorbereiteten Eintrag, sodass Wiederaufnahme ihn nicht doppelt erzeugt. Tatsächliche menschliche Freigabe und betriebliche Prüfung folgen weiterhin den konkreten Workflow-Nachweisen; die technische Schreiberkennung ist kein Personen- oder Identitätsnachweis.
+
+Vorhandene Archive ohne `audit_trail` bleiben lesbar. Bei der nächsten Katalogänderung wird ihr Ausgangsbestand als `existing_state` erhalten. Frühere Eingangstermine oder Kontrollhandlungen werden nicht rückwirkend behauptet. Die Protokollzeit belegt die lokale Verarbeitung, nicht automatisch den früheren E-Mail-Eingang. Separat gespeicherte Checklistenänderungen bleiben über die verschlüsselte Datei und Git-Historie prüfbar; sie sind keine Katalogänderungsereignisse. Direktmanipulationen außerhalb der Helfer sind nicht durch eine Anwendungssperre verhindert; unabhängige Zeitnachweise und Sicherungen bleiben erforderlich.
+
+Vor einem neuen Datencommit speichert die Veröffentlichung unter `processing_controls` einmalig je Pipelinekennung die tatsächlich bestandene Archiv-Integritätsprüfung mit Datum, Toolrevision, geprüftem Kataloghash und Beleg-/Dokumentanzahl. Auch dieser Nachweis wird verschlüsselt, protokolliert und im Datencommit verankert. Er behauptet ausdrücklich keinen vollständigen Quellenabgleich. Unveränderte Leseprüfungen und reine OTS-Nachweiscommits verändern den Katalog nicht. Fehler bleiben über Pipeline-/Transaktionszustand sichtbar; deren Ursachen und Behebung sind zusätzlich betrieblich nachzuweisen. Quellenabgleich und Wiederherstellungstests sind weiterhin durchzuführen und separat zu dokumentieren. [BMF: GoBD, Rz. 59–60, 88, 100, 107–117](https://ao.bundesfinanzministerium.de/ao/2026/Anhaenge/BMF-Schreiben-und-gleichlautende-Laendererlasse/Anhang-33/inhalt.html).
+
+Die zentrale Schreibfunktion erlaubt bei Originaldateien ausschließlich das erneute Schreiben identischer Bytes. Der Kataloghelfer verbietet die Entfernung vorhandener Dokumentreferenzen sowie die Änderung ihrer Originalhashes oder Größen. Korrekturen bekommen neue Originale und bleiben verknüpft. Das ist eine zusätzliche Anwendungskontrolle, keine physische WORM-Sperre des Dateisystems.
+
 UBL 2.1 und unterstützte CII-D16B-XML werden ohne externe Validatorübertragung verarbeitet. XML-Parser verbieten DTD/Entities und Netzwerkzugriff. Die XSDs stammen aus der festgelegten `factur-x`-Abhängigkeit. CEN-Regeln sind unverändert mit Version und SHA256 enthalten; Prüfergebnisse nennen Regeln/Fehlerkennungen und Validierungsgrenzen. Nationale CIUS-Regeln werden nicht geprüft. [CEN-EN16931-Validierungsartefakte, Release 1.3.16](https://github.com/ConnectingEurope/eInvoicing-EN16931/releases/tag/validation-1.3.16).
 
 Eingebettete Original-XML wird bytegleich zusätzlich zum empfangenen PDF archiviert. Eigene XML und PDF sind getrennte Originaldateien desselben Vorgangs. Auch E-Rechnungsdaten und wesentliche Anhänge müssen erhalten bleiben. [BMF: GoBD-Änderung vom 14.07.2025](https://www.bundesfinanzministerium.de/Content/DE/Downloads/BMF_Schreiben/Weitere_Steuerthemen/Abgabenordnung/2025-07-14-GoBD-2-aenderung.pdf?__blob=publicationFile&v=2).
@@ -70,6 +80,10 @@ Eingebettete Original-XML wird bytegleich zusätzlich zum empfangenen PDF archiv
 | Datei/Feld | Bedeutung |
 |---|---|
 | `catalog.json` | Vollständiger entschlüsselter Katalog mit unveränderten internen Referenzen |
+| `catalog-nodes.csv` | Jeder Katalogwert und Container mit Typ, RFC6901-Pfad, Elternpfad und Schlüssel; einschließlich Historien und Protokollen |
+| `records.csv` | Belege und Entwürfe mit aktuellen/historischen Ständen, Textnummern, Beträgen und Katalogverweis |
+| `documents.csv`, `record-documents.csv` | Originalreferenzen, Exportpfade, Hashes, Größen und versionierte Beleg-/Originalverknüpfungen |
+| `data-description.json` | Maschinenlesbare Spaltenbeschreibungen, Feldtypen, UTF-8/CSV-Format und Tabellenprüfsummen |
 | `records.*.current/history` | Aktueller Belegstand und erhaltene Metadatenversionen |
 | `documents` | Originalhash, Größe, Zuordnung und Dokumentrolle |
 | `local_*_drafts` | Entwurfsstände und deren Historien; noch keine Buchung |
@@ -77,6 +91,8 @@ Eingebettete Original-XML wird bytegleich zusätzlich zum empfangenen PDF archiv
 | `cash_events/cash_event_voids` | Erfasste Zahlungen und nachvollziehbare Zahlungsberichtigungen |
 | `cash_source_overrides` | Vorrang der manuell geprüften Zahlungsquelle |
 | `homeoffice_allowances` | Bestätigte Jahresansätze mit Historie; kein Geldfluss |
+| `audit_trail` | Erhaltener Ausgangsbestand, verkettete Katalogänderungen mit Vorher-/Nachher-Werten und Toolrevision |
+| `processing_controls` | Durchgeführte technische Archivprüfung vor Veröffentlichung; kein Vollständigkeitsnachweis |
 | `local_*_settings/events/workflow`, `imports` | Profile, Ablauf-/Änderungsinformationen und Importprovenienz |
 | `bookkeeping_checklist.json` | Operative Abstimmung des privaten Workspaces |
 | `export-manifest.json` | Zuordnung verschlüsselter Referenzen zu Originalexporten, Umfang und Kataloghash |
@@ -84,6 +100,8 @@ Eingebettete Original-XML wird bytegleich zusätzlich zum empfangenen PDF archiv
 | `nachweise/`, `migration/*.enc` | Zeitbeweise und versiegelte Migrationsnachweise |
 
 Git-Objekte liegen nicht im Klartextexport. Vollständige Git-Historien sind über die CD-Sicherung wiederherstellbar. Für eine Prüfung werden geeignete Entschlüsselung, Datenbeschreibung und Auswertungsmöglichkeit bereitgestellt; Umfang, Zugriffsart und Übermittlung sind konkret abzustimmen. Keine behördliche Importschnittstelle wird behauptet.
+
+CSV verwendet UTF-8, Semikolon, vollständig eingeschlossene Felder, doppelte Anführungszeichen als Escape und LF-Zeilenende. Dokumentnummern bleiben Text mit führenden Nullen. Fehlende Belegbeträge bleiben leer; sie werden nicht zu Null umgedeutet. Der vollständige Knotenexport enthält sämtliche Werte und Beziehungen, auch außerhalb der vereinfachten Belegtabelle. Geldbeträge in `records.csv` sind Dezimalwerte in Währungseinheiten; gemischte Steuergruppen bleiben zusätzlich im Katalog/Knotenexport. Der vollständige Original-/JSON-Export bleibt erhalten. Ein allgemeines PDF/A-Format ist keine pauschale GoBD-Voraussetzung; Originalformat und maschinelle Auswertbarkeit sind zu sichern. Der Beschreibungsstandard der Finanzverwaltung ist eine freiwillige Bereitstellungshilfe; diese CSV-/JSON-Dateien behaupten keine Umsetzung seines XML-Profils. [BMF: GoBD, Rz. 131–135, 176 und Anlage zur Datenüberlassung](https://ao.bundesfinanzministerium.de/ao/2026/Anhaenge/BMF-Schreiben-und-gleichlautende-Laendererlasse/Anhang-33/inhalt.html).
 
 ## 4. Betriebsdokumentation
 

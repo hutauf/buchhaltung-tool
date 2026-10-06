@@ -181,6 +181,25 @@ class Publication:
             else:
                 if state.get("after_digest") and self.digest() != state["after_digest"]:
                     raise WorkflowError("Archiv wurde nach unterbrochener Veröffentlichung verändert")
+                if not state.get("after_digest"):
+                    # Persist the actual archive check once per publication. This
+                    # is a technical control, never a claim of source completeness.
+                    import copy
+                    from autobookkeeping.local_invoices import LocalInvoices, now
+                    with FileLock(self.repo / "output/archive.lock", timeout=0):
+                        archive = Archive(self.repo)
+                        checked = archive.verify()
+                        before = archive.catalog()
+                        if state["token"] not in before.get("processing_controls", {}):
+                            after = copy.deepcopy(before)
+                            after.setdefault("processing_controls", {})[state["token"]] = {
+                                "at": now(), "type": "archive_integrity", "result": "passed",
+                                "tool_commit": state["tool_commit"], "action": state["action"],
+                                "checked_catalog_sha256": sha(encoded(before)),
+                                "records": checked["records"], "documents": checked["documents"],
+                                "source_completeness_checked": False,
+                            }
+                            LocalInvoices(archive).commit(before, after, {})
                 atomic(self.repo / "tool-version.json", encoded({"version": 1, "git_commit": state["tool_commit"]}))
                 state["after_digest"] = self.digest(); state["phase"] = "commit"; self.write()
                 subprocess.run([sys.executable, "-X", "utf8", str(tool_root() / "scripts/build_bookkeeping_dashboard.py")],

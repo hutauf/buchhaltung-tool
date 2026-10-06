@@ -142,8 +142,11 @@ class Archive:
 
     def write(self, name: str, data: bytes) -> None:
         path = within(self.root, name)
-        if path.exists() and self.read(name) == data:
-            return
+        if path.exists():
+            if self.read(name) == data:
+                return
+            if name != "database.json.enc":
+                raise ValueError("Vorhandenes Original darf nicht überschrieben werden")
         atomic(path, seal(self.unlock(), data, name))
         if self.read(name) != data:
             raise ValueError("Rückleseprüfung fehlgeschlagen")
@@ -151,7 +154,18 @@ class Archive:
     def catalog(self) -> dict:
         return json.loads(self.read("database.json.enc"))
 
+    def prepare_catalog(self, catalog: dict) -> None:
+        from autobookkeeping.audit_trail import prepare
+        from autobookkeeping.workspace import tool_root, git as tool_git
+        try:
+            revision = tool_git(tool_root(), "rev-parse", "HEAD").decode().strip()
+        except (OSError, subprocess.CalledProcessError):
+            revision = None
+        prior = self.catalog() if (self.root / "database.json.enc").exists() else None
+        prepare(prior, catalog, revision)
+
     def save_catalog(self, catalog: dict) -> None:
+        self.prepare_catalog(catalog)
         self.write("database.json.enc", encoded(catalog))
         # Public inventory exposes only opaque paths and ciphertext hashes.
         files = {}
@@ -271,7 +285,9 @@ class Archive:
                 raise ValueError('Zusatznachweis verweist auf fehlendes Original')
         from autobookkeeping.ledger_validation import validate
         validate(catalog)
-        return {"ok": True, "records": len(catalog["records"]), "documents": len(catalog["documents"])}
+        from autobookkeeping.audit_trail import validate as validate_trail
+        audit = validate_trail(catalog)
+        return {"ok": True, "records": len(catalog["records"]), "documents": len(catalog["documents"]), "audit": audit}
 
     def import_evidence(self, source: Path, metadata: Path) -> dict:
         """Preserve supporting business originals without inventing an expense."""
@@ -339,6 +355,8 @@ class Archive:
             row["documents"] = [name[:-4] for name in row["documents"]]
             exported.append(row)
         atomic(target / 'catalog.json', encoded(catalog))
+        from autobookkeeping.inspection_export import write_tables
+        table_hashes = write_tables(target, catalog, files)
         checklist = self.repo / 'bookkeeping_checklist.json.enc'
         if checklist.exists():
             atomic(target / 'bookkeeping_checklist.json', unseal(self.unlock(), checklist.read_bytes(), 'bookkeeping_checklist.json'))
@@ -355,6 +373,7 @@ class Archive:
             atomic(target / 'migration' / path.relative_to(self.repo / 'migration'), path.read_bytes())
         atomic(target / 'export-manifest.json', encoded({'version':2,'scope':'complete',
             'catalog_sha256':sha(encoded(catalog)), 'documents':files, 'view_year':year,
+            'inspection_files_sha256':table_hashes,
             'retention_years':11, 'secrets_included':False}))
         atomic(outside(self.repo, target / "database.json"), encoded({"schema_version": 1, "records": exported,
                "imports": catalog["imports"], "view_year":year,

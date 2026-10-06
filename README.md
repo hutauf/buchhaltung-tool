@@ -22,6 +22,12 @@ Abrechnungen, Banknachweise oder zunächst ungeklärte Belege ohne Ausgabenbuchu
 
 Die Nachweismetadaten enthalten genau `date` (ISO-Datum), `description` und `verification_basis`. Dieser Archivvorgang führt die Commit-/Push-/OTS-Pipeline aus, erzeugt aber keinen EÜR-Eintrag und keinen Zahlungsfluss. Monatliche CD-Sicherung und Rückleseprüfung bleiben getrennte Arbeitsschritte.
 
+## Technische Protokolle und Prüfexport
+
+Katalogänderungen werden automatisch in einem verschlüsselten, verketteten Änderungsprotokoll gespeichert. Vorherige Werte, Änderungszeitpunkt und Toolrevision bleiben prüfbar. Vorhandene Originaldateien und ihre Inventar-Prüfsummen dürfen die Helfer nicht überschreiben oder entfernen. Die Veröffentlichung speichert außerdem die tatsächlich bestandene technische Archivprüfung. Das belegt keinen vollständigen Quellenabgleich.
+
+Der vollständige Prüfexport enthält zusätzlich `catalog-nodes.csv` (sämtliche Katalogwerte und Verknüpfungen), `records.csv` (Belege/Entwürfe einschließlich Versionen), `documents.csv`, `record-documents.csv` und `data-description.json` mit Feldtypen, Format und Prüfsummen. Alle Dateien entstehen außerhalb beider Repos; die normalen Arbeitsbefehle bleiben gleich. Bestehende Archive ohne dieses Protokoll bleiben lesbar und starten es erst bei der nächsten Katalogänderung mit einem ausdrücklich bezeichneten Ausgangsstand. Frühere Ereigniszeiten werden nicht erfunden.
+
 ## Zwei unabhängige Repositories
 
 Dieses öffentliche Repository enthält ausschließlich Code, Vorlagen, Skills und synthetische Tests. `daten/` ist vollständig ignoriert: dort wird ein **eigenständiges privates Git-Repo** geklont. Es gibt keine Submodule-Verknüpfung. Belege, Schlüsselhülle, verschlüsselte Datenbank, verschlüsselte Checkliste, Nachweise und das persönliche Dashboard gehören ausschließlich ins Datenrepo. `.env` bleibt lokal.

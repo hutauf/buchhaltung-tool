@@ -85,6 +85,11 @@ def assert_complete(repo, archive, git, result):
     statement = repo / 'buchhaltung/nachweise' / (result['data_commit'] + '.json')
     assert verify_checkpoint(repo, statement)['git_integrity']
     assert archive.catalog()['homeoffice_allowances']['2026']['current']['days'] == 100
+    controls = list(archive.catalog()['processing_controls'].values())
+    assert len(controls) == 1
+    assert controls[0]['type'] == 'archive_integrity' and controls[0]['result'] == 'passed'
+    assert controls[0]['source_completeness_checked'] is False
+    assert archive.verify()['audit']['status'] == 'verified'
     assert not (repo / 'output/publication.json').exists()
     assert 'PRIVATE SYNTHETIC BASIS' not in (repo / 'dashboard.html').read_text(encoding='utf8')
     assert '.env' not in git('ls-files')
@@ -194,6 +199,24 @@ def test_encrypted_journal_recovery_then_publication(fixture, monkeypatch):
     assert (repo / 'output/local-invoice-transaction.enc').exists()
     monkeypatch.setattr(archive, 'save_catalog', original)
     assert_complete(repo, archive, git, resume(repo))
+
+
+def test_failure_after_control_record_resumes_without_duplicate_control(fixture, monkeypatch):
+    repo, archive, git = fixture
+    original = LocalInvoices.commit
+
+    def control_saved_then_crashed(self, before, after, documents):
+        original(self, before, after, documents)
+        if after.get('processing_controls') and not before.get('processing_controls'):
+            raise OSError('Synthetic power loss after control record')
+
+    monkeypatch.setattr(LocalInvoices, 'commit', control_saved_then_crashed)
+    with pytest.raises(OSError):
+        save(repo, archive)
+    recorded = archive.catalog()['processing_controls']
+    monkeypatch.setattr(LocalInvoices, 'commit', original)
+    assert_complete(repo, archive, git, resume(repo))
+    assert archive.catalog()['processing_controls'] == recorded
 
 
 def test_hook_can_reacquire_archive_lock(fixture):
