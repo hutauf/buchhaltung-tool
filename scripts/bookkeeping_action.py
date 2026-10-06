@@ -31,7 +31,7 @@ def command(args, section, row):
         if not args.output: raise WorkflowError("Neuen Ausgabeordner außerhalb des Repos angeben")
         if row.get("kind", "invoice") == "expense":
             return ["receipt.py", "inspect", str(ROOT / "buchhaltung" / row["documents"][0]), "--output", str(args.output)]
-        return ["local_invoice.py", "preview", rid, "--output", str(args.output)]
+        return ["local_invoice.py", "preview", rid, "--output", str(args.output), *(['--e-invoice'] if getattr(args,'e_invoice',False) else [])]
     if args.action == "finish":
         if section not in ("local_invoice_drafts", "local_adjustment_drafts", "local_expense_drafts"):
             raise WorkflowError("Kein lokaler Entwurf")
@@ -66,6 +66,7 @@ def main():
     parser.add_argument("action", choices=("show", "preview", "finish", "discard", "dhl-expense", "cancel-prepare", "refund-prepare", "correct-prepare", "payments"))
     parser.add_argument("--ref", required=True); parser.add_argument("--snapshot", required=True)
     parser.add_argument("--number"); parser.add_argument("--metadata", type=Path); parser.add_argument("--output", type=Path)
+    parser.add_argument("--e-invoice", action="store_true", help="Archivierte Rechnungs-XML zusätzlich ansehen")
     parser.add_argument("--approved", action="store_true"); args = parser.parse_args()
     if not re.fullmatch(r"[a-f0-9]{64}", args.snapshot): raise WorkflowError("Ungültiger Dashboard-Snapshot")
     with FileLock(ROOT / "output/archive.lock", timeout=0):
@@ -80,6 +81,10 @@ def main():
         if target.exists(): raise WorkflowError("Vorschauziel muss neu sein")
         if not row.get("documents"): raise WorkflowError("Kein Original im Archiv vorhanden")
         atomic(target / "original.pdf", archive.read(row["documents"][0]))
+        if args.e_invoice:
+            for name in row['documents']:
+                if name.endswith('.xml.enc') or name.endswith('.validation.json.enc'):
+                    atomic(target / Path(name[:-4]).name,archive.read(name))
         atomic(target / "metadaten.json", encoded(row))
         print(json.dumps({"ok": True, "output": str(target)}, ensure_ascii=False)); return 0
     if args.action in ("finish", "payments", "dhl-expense") and not args.approved:

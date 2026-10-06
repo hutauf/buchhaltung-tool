@@ -6,3 +6,5 @@
 *.yaml text eol=lf
 *.yml text eol=lf
 .githooks/* text eol=lf
+src/autobookkeeping/validation/*.xslt -text whitespace=-trailing-space
+src/autobookkeeping/validation/sources.json text eol=lf

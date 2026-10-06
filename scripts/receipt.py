@@ -20,7 +20,7 @@ from autobookkeeping.receipts import Receipts
 def main():
     parser=argparse.ArgumentParser(description="Beliebige Ausgabenbelege lokal prüfen und nach Freigabe verschlüsselt buchen")
     sub=parser.add_subparsers(dest="command",required=True)
-    p=sub.add_parser("inspect",help="PDF/Bild aus beliebigem Pfad lokal lesen; Prüfbilder und JSON-Vorlage außerhalb erzeugen")
+    p=sub.add_parser("inspect",help="PDF/XML/Bild lokal lesen; XML validieren und Metadaten außerhalb vorbefüllen")
     p.add_argument("path",type=Path);p.add_argument("--output",type=Path)
     p=sub.add_parser("prepare",help="Geprüfte Metadaten verschlüsselt vormerken; noch keine Ausgabe buchen")
     p.add_argument("review",type=Path);p.add_argument("--metadata",type=Path,required=True)

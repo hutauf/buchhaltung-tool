@@ -13,6 +13,7 @@ from pathlib import Path
 from autobookkeeping.archive import atomic, encoded, outside, sha, within
 from autobookkeeping.local_invoices import LocalInvoices, WorkflowError, now
 from autobookkeeping.taxes import decimal_money
+from autobookkeeping.einvoices import embedded_xml, inspect_xml
 
 CATEGORIES = ("software_subscriptions", "marketplace_fees", "postage", "office", "goods", "other")
 TAX_TYPES = ("as_documented", "no_vat_shown", "mixed", "special_review")
@@ -46,6 +47,33 @@ def existing(catalog, digest, metadata=None):
 def dhl_guard(catalog,digest):
     if any(entry["sha256_plaintext"]==digest and entry.get("role")=="unbooked_receipt" for entry in catalog["documents"].values()):
         raise WorkflowError("Vorgemerkten DHL-Beleg über den zugehörigen Rechnungsabschluss buchen")
+
+
+def structured_source(data, extension):
+    try:
+        xml = data if extension == '.xml' else embedded_xml(data) if extension == '.pdf' else None
+        return (xml, inspect_xml(xml)) if xml is not None else (None, None)
+    except ValueError as exc:
+        raise WorkflowError(str(exc)) from None
+
+
+def match_structured(metadata, result):
+    if not result: return
+    if not result['validation']['en16931_valid']:
+        raise WorkflowError('Rechnungs-XML ungültig; Original als Nachweis archivieren und Quelle klären')
+    if result['document_type'] != 'invoice':
+        raise WorkflowError('Lieferanten-Korrekturbeleg separat zuordnen; nicht als positive Ausgabe buchen')
+    source = result['metadata']
+    for field in ('payee', 'number', 'date', 'currency', 'supplier_country', 'vat_rate'):
+        if metadata.get(field) != source.get(field):
+            raise WorkflowError('Geprüfte Metadaten weichen von Rechnungs-XML ab: ' + field)
+    for field in ('gross', 'net', 'vat'):
+        if Decimal(metadata[field]) != Decimal(source[field]):
+            raise WorkflowError('Geprüfte Beträge weichen von Rechnungs-XML ab: ' + field)
+    if metadata.get('vat_breakdown', []) != source.get('vat_breakdown', []):
+        raise WorkflowError('Steuergruppen weichen von Rechnungs-XML ab')
+    if source['tax_review_required'] and not metadata['tax_review_required']:
+        raise WorkflowError('Offene Sondersteuerprüfung der XML darf nicht entfallen')
 
 
 def validate_metadata(raw):
@@ -128,8 +156,11 @@ class Receipts:
             data=self.archive.read(name);extension=Path(name[:-4]).suffix.lower()
         else:
             name=None;data=source.read_bytes();extension=source.suffix.lower()
-        if extension not in (".pdf",".png",".jpg",".jpeg"):raise WorkflowError("PDF, PNG oder JPEG erforderlich")
-        with pymupdf.open(stream=data,filetype=extension[1:]) as doc:
+        if extension not in (".pdf",".png",".jpg",".jpeg",".xml"):raise WorkflowError("PDF, XML, PNG oder JPEG erforderlich")
+        xml, structured = structured_source(data, extension)
+        count=0; pages=[]; texts=[]
+        if extension != '.xml':
+          with pymupdf.open(stream=data,filetype=extension[1:]) as doc:
             if doc.needs_pass:raise WorkflowError("Passwortgeschütztes PDF separat entsperren")
             count=doc.page_count
             if not count or count>500:raise WorkflowError("Leerer/zu umfangreicher Beleg; gezielte Prüfung erforderlich")
@@ -138,6 +169,12 @@ class Receipts:
             atomic(target/("original"+extension),data)
             for index in pages:
                 atomic(target/f"seite-{index+1:03d}.png",doc[index].get_pixmap(matrix=pymupdf.Matrix(1.6,1.6)).tobytes("png"))
+        else:
+            atomic(target/'original.xml',data)
+            texts=[encoded(structured).decode('utf-8')]
+        if structured:
+            atomic(target/'strukturierte-daten.json',encoded(structured))
+            if extension != '.xml':atomic(target/'eingebettete-rechnung.xml',xml)
         relocated=False
         if name is None and source.is_relative_to(self.archive.repo):
             relative=source.relative_to(self.archive.repo).as_posix()
@@ -155,9 +192,11 @@ class Receipts:
         template={"payee":None,"number":None,"date":None,"currency":None,"gross":None,"net":None,"vat":None,
                   "vat_rate":None,"tax_treatment":None,"tax_review_required":False,"description":None,"category":None,
                   "supplier_country":None,"business_use":None,"pay_date":None,"verification_basis":None}
+        if structured and structured.get('metadata'):template.update(structured['metadata'])
         atomic(target/"metadaten.json",encoded(template))
         return {"ok":True,"review":str(target/"review.json"),"metadata":str(target/"metadaten.json"),"text":str(target/"text.txt"),
                 "pages":count,"images":[str(target/f"seite-{i+1:03d}.png") for i in pages],"source_relocated_outside":relocated,
+                "structured_invoice":bool(structured),"xml_validation":structured['validation'] if structured else None,
                 "text_characters":sum(len(t) for t in texts),
                 "relocated_source":review["relocated_source"],
                 **existing(catalog,sha(data))}
@@ -167,7 +206,9 @@ class Receipts:
         metadata=validate_metadata(json.loads(outside(self.archive.repo,metadata_path).read_bytes()))
         original=outside(self.archive.repo,within(review_path.parent,review["original_file"]));data=original.read_bytes();digest=sha(data)
         if digest!=review["source_sha256"]:raise WorkflowError("Prüfkopie wurde verändert; Original erneut einlesen")
-        if review["extension"] not in (".pdf",".png",".jpg",".jpeg"):raise WorkflowError("Belegformat nicht unterstützt")
+        if review["extension"] not in (".pdf",".png",".jpg",".jpeg",".xml"):raise WorkflowError("Belegformat nicht unterstützt")
+        xml, structured = structured_source(data, review['extension'])
+        match_structured(metadata, structured)
         self.archive.verify();before=self.archive.catalog();after=copy.deepcopy(before)
         duplicates=existing(after,digest,metadata)
         if duplicates["existing_records"]:raise WorkflowError("Beleg bereits archiviert; vorhandenen Datensatz verwenden")
@@ -186,6 +227,16 @@ class Receipts:
         candidate=dict(metadata,id=did,kind="expense",document_type="expense",status="test_draft",source="local",year=year,
                        number=metadata.get("number"),documents=[name],coverage="complete",source_sha256=digest,
                        duplicate_candidates=duplicates["possible_duplicates"],metadata=metadata)
+        if structured:
+            candidate['structured_invoice'] = structured
+            extras=[('validation.json',encoded(structured),'e_invoice_validation')]
+            if review['extension'] != '.xml':extras.append(('xml',xml,'e_invoice_xml'))
+            for suffix,payload,role in extras:
+                extra=f"{year}/Ausgaben/{sha(payload)}.{suffix}.enc"
+                candidate['documents'].append(extra)
+                if extra not in after['documents']:
+                    documents[extra]=payload
+                    after['documents'][extra]={'record_id':did,'role':role,'sha256_plaintext':sha(payload),'bytes_plaintext':len(payload)}
         candidate["provenance"] = copy.deepcopy(previous["current"]["provenance"]) if previous else {
             "first_source_path":review["source_path"],"source_sha256":digest,"inspected_at":review["created_at"],
             "relocated_source":review.get("relocated_source")}
@@ -212,6 +263,9 @@ class Receipts:
         if sha(encoded({k:v for k,v in candidate.items() if k!="revision"}))!=revision:
             raise WorkflowError("Metadatenrevision passt nicht zum vorgemerkten Inhalt")
         metadata=validate_metadata(candidate["metadata"]);digest=candidate["source_sha256"]
+        original_name=candidate['documents'][0]
+        _, structured = structured_source(self.archive.read(original_name),Path(original_name[:-4]).suffix.lower())
+        match_structured(metadata, structured)
         dhl_guard(after,digest)
         if existing(after,digest,metadata)["existing_records"]:raise WorkflowError("Zwischenzeitlich als Ausgabe/anderer Beleg archiviert")
         possible=existing(after,digest,metadata)["possible_duplicates"]
@@ -221,6 +275,8 @@ class Receipts:
                  number=metadata.get("number"),documents=candidate["documents"],coverage="complete",vat_basis="reviewed_original_receipt",
                  source_record=metadata,recorded_at=now(),approved_revision=revision)
         row["provenance"] = copy.deepcopy(candidate["provenance"])
+        if candidate.get('structured_invoice'):
+            row['structured_invoice'] = copy.deepcopy(candidate['structured_invoice'])
         after["records"][rid]={"current":row,"history":[]}
         value["history"].append(copy.deepcopy(candidate));value["current"]=dict(candidate,status="recorded",record_id=rid,booked_at=now())
         after.setdefault("local_events",[]).append({"action":"expense_receipt","record_id":rid,"approved_revision":revision,"at":now()})

@@ -10,6 +10,8 @@ from pathlib import Path
 ROOT_FILES={'.bookkeeping-tool.json','.gitattributes','.gitignore','AGENTS.md','README.md','LICENSE','pyproject.toml','requirements.txt'}
 DIRECTORIES={'src','scripts','tests','docs','skills','.github','.githooks'}
 SUFFIXES={'.py','.md','.html','.toml','.txt','.yaml','.yml'}
+VALIDATION_FILES={'src/autobookkeeping/validation/'+name for name in
+                  ('EN16931-UBL-validation.xslt','EN16931-CII-validation.xslt','sources.json')}
 
 
 def git(repo,*args,input=None):
@@ -119,7 +121,7 @@ def audit(repo,name,email,staged=False,extra=(),fingerprints=None,historical_ide
     contents=blobs(repo,[oid for path,mode,oid in entries if mode in ('100644','100755')])
     for path,mode,oid in set(entries):
         p=Path(path)
-        allowed=path in ROOT_FILES or p.parts[0] in DIRECTORIES and (p.suffix in SUFFIXES or p.parts[0]=='.githooks' and p.name in ('pre-commit','pre-push'))
+        allowed=path in ROOT_FILES or path in VALIDATION_FILES or p.parts[0] in DIRECTORIES and (p.suffix in SUFFIXES or p.parts[0]=='.githooks' and p.name in ('pre-commit','pre-push'))
         if not allowed or mode not in ('100644','100755'):
             issues.append({'scope':'file','path':path,'reason':'not_public_code'});continue
         for reason in content_issues(contents[oid],pattern,secrets):issues.append({'scope':'file','path':path,'reason':reason})

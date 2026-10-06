@@ -155,6 +155,9 @@ def index_catalog(repo:Path)->tuple[dict,str]:
             for row in [value["current"],*value["history"]]:
                 if any(name not in catalog["documents"] for name in row["documents"]):
                     raise ValueError("Gestagter Datensatz verweist auf fehlenden Originalbeleg")
+    for row in catalog.get('archive_evidence',{}).values():
+        if not row.get('documents') or any(n not in catalog['documents'] for n in row['documents']):
+            raise ValueError('Gestagter Zusatznachweis verweist auf fehlendes Original')
     from autobookkeeping.ledger_validation import validate
     validate(catalog)
     return catalog,sha(database)

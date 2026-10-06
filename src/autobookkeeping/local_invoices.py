@@ -414,15 +414,19 @@ class LocalInvoices:
         invoice.pop("revision")
         pdf = render_pdf(invoice, draft=False)
         name = f"{invoice['year']}/Rechnungen/{sha((invoice['id'] + ':' + sha(pdf)).encode())}.pdf.enc"
-        invoice["documents"] = [name]; invoice["revision"] = sha(encoded(invoice))
+        invoice["documents"] = [name]
         after["documents"][name] = {"record_id": invoice["id"], "role": "issued_invoice",
                                     "sha256_plaintext": sha(pdf), "bytes_plaintext": len(pdf)}
+        from autobookkeeping.einvoices import archive_xml
+        documents = {name: pdf}
+        archive_xml(invoice, after, documents)
+        invoice["revision"] = sha(encoded(invoice))
         after["records"][invoice["id"]] = {"current": invoice, "history": []}
         value["history"].append(current)
-        value["current"] = dict(current, status="issued", number=number, invoice_id=invoice["id"], documents=[name])
+        value["current"] = dict(current, status="issued", number=number, invoice_id=invoice["id"], documents=invoice["documents"])
         after["local_workflow"][invoice["id"]] = {"order_id": invoice["order_id"], "sales_record_number": invoice["sales_record_number"],
                                                    "status": "rechnung_abgeschlossen", "invoice_number": number, "expense_id": None}
-        self.commit(before, after, {name: pdf})
+        self.commit(before, after, documents)
         return self.summary(invoice, after)
 
     def discard(self, invoice_id: str) -> dict:
@@ -437,7 +441,7 @@ class LocalInvoices:
         self.commit(before, after, {})
         return {"ok": True, "status": "discarded", "number_consumed": False}
 
-    def preview(self, invoice_id: str, target: Path) -> dict:
+    def preview(self, invoice_id: str, target: Path, e_invoice=False) -> dict:
         self.archive.verify()
         target = outside(self.archive.repo, target)
         if target.exists():
@@ -449,7 +453,15 @@ class LocalInvoices:
             invoice = catalog["records"][invoice["invoice_id"]]["current"]
         if invoice["status"] == "discarded":
             raise WorkflowError("Verworfenen Entwurf nicht als aktuelle Vorschau exportieren")
+        xml = None
+        if e_invoice and invoice.get("kind") != "correction":
+            from autobookkeeping.einvoices import generate_xml, validate_xml
+            stored = next((n for n in invoice["documents"] if n.endswith('.xml.enc')), None)
+            xml, validation = (self.archive.read(stored), validate_xml(self.archive.read(stored))) if stored else generate_xml(invoice, draft=invoice["status"]=="test_draft")
         atomic(target / "rechnung.pdf", self.archive.read(invoice["documents"][0]))
+        if xml:
+            atomic(target / "rechnung.xml", xml)
+            atomic(target / "xml-validierung.json", encoded(validation))
         atomic(target / "metadaten.json", encoded(invoice))
         return dict(self.summary(invoice, catalog), output=str(target))
 

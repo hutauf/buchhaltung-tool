@@ -1,5 +1,10 @@
 # Persönlicher Buchhaltungsworkspace
 
+- Umfang: einzelne EÜR-Einträge, insbesondere Verkäufe und zugehörige Ausgaben. Keine vollständige EÜR behaupten; Vine-Entnahmen später gesondert entwickeln.
+- Alle Originale, XML, Metadatenhistorien, Entwürfe, Zahlungen und Zusatznachweise erhalten. Elf volle Kalenderjahre Mindestaufbewahrung ab Jahresende des letzten relevanten Vorgangs; keine automatische Löschung. Verlängerungen separat prüfen. Jahresfilter dürfen keinen Archivbestand aus Exporten entfernen.
+- `buchhaltung beleg inspect` unterstützt PDF/XML/Bilder. Strukturierte UBL-/CII-Daten lokal validieren, Originale erhalten, betriebliche Nutzung und Zahlung gesondert prüfen. Eigenständige EN16931-XML neben PDF ausgeben; keine XRechnung-/ZUGFeRD-Profilprüfung behaupten.
+- Verfahrensbeschreibung im Tool unter `docs/verfahrensdokumentation.md`; die private `verfahrensdokumentation.md` enthält betriebliche Ergänzung und tatsächliche Kontrollen. Offene Angaben nicht als durchgeführt behandeln.
+
 - Die unabhängige private Git-Wurzel ist dieser Ordner. Helfer liegen im übergeordneten Toolrepo unter `scripts/`; alle CLI-Befehle von dort ausführen.
 - Belege und Personenmetadaten ausschließlich verschlüsselt archivieren. `.env` und entschlüsselte Dateien nie committen. Ansichten und Prüfkopien außerhalb beider Repos erstellen.
 - Vor Anlage Quelle, Beleg, verschlüsselte Datenbank und `bookkeeping_checklist.json.enc` auf vorhandene Vorgänge und Dubletten prüfen. eBay-SRN und Order-ID-Aliase berücksichtigen.

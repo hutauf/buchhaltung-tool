@@ -53,6 +53,7 @@ def main():
         atomic(data / 'AGENTS.md', (TOOL / 'docs/data-AGENTS.md').read_bytes())
         atomic(data / 'buchhaltung/AGENTS.md', (TOOL / 'docs/data-AGENTS.md').read_bytes())
         atomic(data / 'buchhaltung/README.md', (TOOL / 'docs/data-README.md').read_bytes())
+        atomic(data / 'verfahrensdokumentation.md', (TOOL / 'docs/betriebliche-ergaenzung-vorlage.md').read_bytes())
     try: configured = git(data, 'remote', 'get-url', '--push', 'origin').decode().strip()
     except subprocess.CalledProcessError:
         git(data,'remote','add','origin',args.data_url); configured=args.data_url

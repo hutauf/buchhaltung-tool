@@ -2,6 +2,26 @@
 
 Ein Werkzeug für eine eigene verschlüsselte Buchhaltungsablage, lokale Rechnungsentwürfe, Belegimport, EÜR-Arbeitsübersicht und Git-/OpenTimestamps-Nachweise. Kleinunternehmerfälle sowie ausdrücklich geprüfte inländische 7-/19-%-Positionen werden unterstützt. Sondersteuerfälle und eine abgabefertige Steuererklärung sind nicht vollständig abgebildet.
 
+Der aktuelle Umfang sind **einzelne EÜR-Einträge**, vor allem Verkäufe und zugehörige Ausgaben wie Porto und Marktplatzgebühren. Vine-Entnahmen und eine vollständige EÜR folgen erst in späteren Schritten. Die [Verfahrensdokumentation](docs/verfahrensdokumentation.md) beschreibt technische Kontrollen, organisatorische Pflichten und offene Punkte. Vor dem betrieblichen Einsatz die [betriebliche Ergänzung](docs/betriebliche-ergaenzung-vorlage.md) privat ausfüllen; diese Vorlage ist kein Konformitätsnachweis.
+
+## Originale, E-Rechnungen und Aufbewahrung
+
+`buchhaltung beleg inspect PFAD` liest auch eigenständige UBL-/CII-Rechnungs-XML und Rechnungs-XML aus PDF-Anhängen. Gültige strukturierte Daten werden nach lokaler XSD-/EN16931-Prüfung in der Metadatenvorlage vorbefüllt; Zahlung, Kategorie und betrieblicher Bezug bleiben zu bestätigen. Ein PDF ohne Rechnungs-XML bleibt ein PDF-Original. Eine nachträglich erzeugte XML ersetzt niemals das empfangene Original.
+
+Ein freigegebener lokaler Rechnungsabschluss erzeugt PDF **und eigenständige EN16931-UBL-2.1-XML** aus denselben Daten sowie einen Validierungsnachweis. Finanzielle Stornos/Teilerstattungen erhalten ebenfalls XML mit Originalbezug. Formale Berichtigungen bleiben derzeit verknüpfte PDF-Dokumente. `buchhaltung rechnung preview ID --output NEUER_ORDNER_AUSSERHALB --e-invoice` exportiert die XML zur Prüfung; Test-XML trägt eine Testnummer und reserviert keine endgültige Rechnungsnummer. Das ist keine XRechnung-CIUS-Implementierung und kein als ZUGFeRD zertifiziertes PDF/A-3. Kein Versand erfolgt automatisch.
+
+Alle Originale, XML, Metadatenhistorien, Entwürfe, Zahlungen, Prüfergebnisse und archivierten Zusatznachweise bleiben erhalten. Die interne Mindestaufbewahrung beträgt **elf volle Kalenderjahre** ab Jahresende des letzten relevanten Vorgangs zum Dokument. `buchhaltung archiv retention` zeigt die frühestmögliche Prüfung; es gibt keinen automatischen Löschlauf. Laufende Verfahren oder andere Aufbewahrungsgründe können die Frist verlängern. Auch Git-Historie und Sicherungen müssen bei einem späteren Löschkonzept berücksichtigt werden.
+
+`buchhaltung archiv export --output NEUER_ORDNER_AUSSERHALB` exportiert stets den vollständigen aktuellen Archivbestand einschließlich aller im Katalog enthaltenen Historien. `--year` ist nur eine Ansichtsangabe und lässt keine Archivdaten weg. `catalog.json` enthält die vollständigen Metadaten, `export-manifest.json` die Original-Zuordnung; `database.json`/`index.html` bieten die Belegansicht. CD-Exporte enthalten zusätzlich beide vollständigen Git-Historien samt verschlüsselter Migrationshistorie. Passwort und `.env` gehören in keine Sicherung oder Klartextansicht.
+
+Abrechnungen, Banknachweise oder zunächst ungeklärte Belege ohne Ausgabenbuchung ablegen:
+
+```powershell
+.venv\Scripts\buchhaltung.exe archiv evidence --file 'ORIGINAL_AUSSERHALB' --metadata 'NACHWEIS_JSON_AUSSERHALB'
+```
+
+Die Nachweismetadaten enthalten genau `date` (ISO-Datum), `description` und `verification_basis`. Dieser Archivvorgang führt die Commit-/Push-/OTS-Pipeline aus, erzeugt aber keinen EÜR-Eintrag und keinen Zahlungsfluss. Monatliche CD-Sicherung und Rückleseprüfung bleiben getrennte Arbeitsschritte.
+
 ## Zwei unabhängige Repositories
 
 Dieses öffentliche Repository enthält ausschließlich Code, Vorlagen, Skills und synthetische Tests. `daten/` ist vollständig ignoriert: dort wird ein **eigenständiges privates Git-Repo** geklont. Es gibt keine Submodule-Verknüpfung. Belege, Schlüsselhülle, verschlüsselte Datenbank, verschlüsselte Checkliste, Nachweise und das persönliche Dashboard gehören ausschließlich ins Datenrepo. `.env` bleibt lokal.
@@ -19,7 +39,7 @@ py -m venv .venv
 In `daten/.env` lokal `ENCRYPTION_PASSWORD` hinterlegen. Optional benötigte eBay-, GMX- und Vine-Zugangswerte ebenfalls dort konfigurieren; nichts davon committen. Git-Autor im privaten Repo konfigurieren. Vor dem ersten Archiv-CLI muss dort ein initialer Commit mit Rollenmarkierung und Konfiguration existieren und nach `origin/main` gepusht sein:
 
 ```powershell
-git -C daten add .bookkeeping-data.json .gitignore .gitattributes workspace.json AGENTS.md buchhaltung
+git -C daten add .bookkeeping-data.json .gitignore .gitattributes workspace.json AGENTS.md verfahrensdokumentation.md buchhaltung
 git -C daten commit -m "Initialize private bookkeeping workspace"
 git -C daten push -u origin main
 .venv\Scripts\python.exe -X utf8 scripts\bookkeeping_archive.py init
@@ -91,4 +111,4 @@ Die CD-Sicherung enthält die öffentliche Toolhistorie als Bundle und die priva
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-Lizenz: MIT, siehe `LICENSE`.
+Eigener Toolcode: MIT, siehe `LICENSE`. Die unveränderten CEN-EN16931-Validierungsartefakte stehen unter EUPL 1.2; Herkunft, Version und Prüfsummen liegen in `src/autobookkeeping/validation/`.

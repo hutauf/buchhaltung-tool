@@ -1,5 +1,11 @@
 # Verschlüsselte Buchhaltungsablage
 
+Diese Ablage erfasst einzelne EÜR-Einträge und alle zugehörigen Originale/Nachweise. Mindestaufbewahrung: elf volle Kalenderjahre nach Jahresende des letzten relevanten Vorgangs; keine automatische Löschung. `buchhaltung archiv export` exportiert den vollständigen Katalog und alle Dokumente, auch mit einer Jahresansichtsangabe. `buchhaltung archiv retention` ist nur eine Fristenübersicht. Abrechnungen und Zahlungsnachweise ohne Buchung mit `buchhaltung archiv evidence --file ORIGINAL --metadata JSON_AUSSERHALB` sichern; JSON enthält `date`, `description`, `verification_basis`.
+
+`buchhaltung beleg inspect` liest PDF/XML/Bilder und befüllt Metadaten aus gültiger strukturierter XML. Zahlung und betriebliche Zuordnung bleiben zu prüfen. Neue lokale Rechnungen erhalten PDF plus eigenständige validierte EN16931-UBL-XML. Vorschau: `buchhaltung rechnung preview ID --output NEUER_ORDNER_AUSSERHALB --e-invoice`. Probebetrieb und konkrete Abschlussfreigaben bleiben bestehen.
+
+Die allgemeine Verfahrensbeschreibung liegt im Tool unter `docs/verfahrensdokumentation.md`. Die private Ergänzung unter `daten/verfahrensdokumentation.md` vor dem betrieblichen Einsatz ausfüllen und mit tatsächlich durchgeführten Kontrollen versionieren.
+
 Dieser Ordner liegt im unabhängigen privaten Datenrepo. Der äußere Toolordner enthält `scripts/`, Python-Umgebung und den Belegimport-Skill. Alle folgenden Befehle dort starten. Datenbank und Originalbelege liegen unter `daten/buchhaltung/`; `.env` unter `daten/.env` bleibt lokal.
 
 ```powershell

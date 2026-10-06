@@ -71,6 +71,7 @@ def main() -> dict:
     p = sub.add_parser("cash-void")
     p.add_argument("id"); p.add_argument("--reason", required=True); p.add_argument("--approved", action="store_true")
     p = sub.add_parser("preview"); p.add_argument("id"); p.add_argument("--output", required=True, type=Path)
+    p.add_argument("--e-invoice", action="store_true", help="Validierte EN16931-XML zusätzlich exportieren; Testentwurf verbraucht keine Nummer")
     p = sub.add_parser("discard"); p.add_argument("id")
     p = sub.add_parser("activate", help="Lokale Nummernübergabe nach Freigabe aktivieren")
     p.add_argument("--last-number", required=True); p.add_argument("--handover", type=Path, required=True)
@@ -132,7 +133,7 @@ def main() -> dict:
                 elif args.command == "cash-void":
                     result = void_cash(workflow, args.id, args.reason, args.approved)
                 elif args.command == "preview":
-                    result = workflow.preview(args.id, args.output)
+                    result = workflow.preview(args.id, args.output, args.e_invoice)
                 elif args.command == "discard":
                     result = workflow.discard(args.id)
                 elif args.command == "activate":

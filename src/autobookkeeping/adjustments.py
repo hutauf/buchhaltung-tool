@@ -218,12 +218,17 @@ class Adjustments:
                    status="issued", date=today(),year=today()[:4],issued_at=now(),coverage="complete",cash_effect="not_recorded")
         pdf=render_pdf(row,draft=False)
         name=f"{row['year']}/Rechnungen/{sha((row['id']+':'+sha(pdf)).encode())}.pdf.enc"
-        row["documents"]=[name];row["revision"]=sha(encoded(row))
+        row["documents"]=[name]
         after["documents"][name]={"record_id":row["id"],"role":row["kind"],"sha256_plaintext":sha(pdf),"bytes_plaintext":len(pdf)}
+        documents={name:pdf}
+        if row['kind']=='credit_note':
+            from autobookkeeping.einvoices import archive_xml
+            archive_xml(row,after,documents)
+        row["revision"]=sha(encoded(row))
         after["records"][row["id"]]={"current":row,"history":[]}
-        value["history"].append(copy.deepcopy(draft));value["current"]=dict(draft,status="issued",number=row["number"],document_number=proposal,invoice_id=row["id"],documents=[name])
+        value["history"].append(copy.deepcopy(draft));value["current"]=dict(draft,status="issued",number=row["number"],document_number=proposal,invoice_id=row["id"],documents=row["documents"])
         after.setdefault("local_events",[]).append({"action":row["document_type"],"record_id":row["id"],"original_id":row["original_id"],"at":now()})
-        self.workflow.commit(before,after,{name:pdf})
+        self.workflow.commit(before,after,documents)
         return {"ok":True,"id":row["id"],"number":proposal,"original_number":row["original_number"],"gross":row["gross"],"refund_executed":False}
 
 

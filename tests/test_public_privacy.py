@@ -23,6 +23,18 @@ def test_valid_code_and_identity_pass(repo):
     assert audit(repo,NAME,EMAIL,fingerprints=set())['ok']
 
 
+def test_known_validation_paths_still_scan_contents_and_other_xml_is_blocked(repo):
+    path=repo/'src/autobookkeeping/validation/EN16931-UBL-validation.xslt'
+    path.parent.mkdir(parents=True);path.write_text('SYNTHETIC RULES')
+    git(repo,'add','.');assert audit(repo,NAME,EMAIL,staged=True,fingerprints=set())['ok']
+    path.write_text('SYNTHETIC SENSITIVE VALUE');git(repo,'add','.')
+    assert not audit(repo,NAME,EMAIL,staged=True,fingerprints={'synthetic sensitive value'})['ok']
+    path.write_text('SYNTHETIC RULES')
+    (path.parent/'private-invoice.xml').write_text('SYNTHETIC INVOICE')
+    git(repo,'add','.')
+    assert any(i['reason']=='not_public_code' for i in audit(repo,NAME,EMAIL,staged=True,fingerprints=set())['issues'])
+
+
 def test_old_private_content_is_detected_after_current_file_is_clean(repo):
     (repo/'README.md').write_text('SYNTHETIC SENSITIVE VALUE\n');git(repo,'add','.');git(repo,'commit','-m','Synthetic test record')
     (repo/'README.md').write_text('Public code again\n');git(repo,'add','.');git(repo,'commit','-m','Synthetic clean state')

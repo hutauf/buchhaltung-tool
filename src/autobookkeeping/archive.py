@@ -266,9 +266,38 @@ class Archive:
                     raise ValueError("Vorgemerkter Beleg fehlt")
                 if record.get("kind") != "expense" and record["status"] in ("test_draft", "discarded") and record["number"] is not None:
                     raise ValueError("Testentwurf darf keine Rechnungsnummer verbrauchen")
+        for row in catalog.get('archive_evidence',{}).values():
+            if not row.get('documents') or any(n not in catalog['documents'] for n in row['documents']):
+                raise ValueError('Zusatznachweis verweist auf fehlendes Original')
         from autobookkeeping.ledger_validation import validate
         validate(catalog)
         return {"ok": True, "records": len(catalog["records"]), "documents": len(catalog["documents"])}
+
+    def import_evidence(self, source: Path, metadata: Path) -> dict:
+        """Preserve supporting business originals without inventing an expense."""
+        from datetime import date
+        from autobookkeeping.local_invoices import LocalInvoices
+        source=outside(self.repo, source); metadata=outside(self.repo, metadata)
+        raw=json.loads(metadata.read_bytes())
+        if set(raw) != {'date','description','verification_basis'} or not all(isinstance(v,str) and v.strip() for v in raw.values()):
+            raise ValueError('Nachweis benötigt Datum, Beschreibung und konkrete Prüfbasis')
+        day=date.fromisoformat(raw['date'])
+        extension=source.suffix.lower()
+        if extension not in ('.pdf','.xml','.csv','.json','.eml','.txt','.png','.jpg','.jpeg') or source.stat().st_size>100_000_000:
+            raise ValueError('Nachweisformat/Größe nicht unterstützt')
+        data=source.read_bytes(); digest=sha(data)
+        if not data:raise ValueError('Nachweis ist leer')
+        self.verify();before=self.catalog()
+        existing=[n for n,e in before['documents'].items() if e['sha256_plaintext']==digest]
+        if existing:return {'ok':True,'changed':False,'documents':existing,'booked':False}
+        import copy
+        after=copy.deepcopy(before)
+        name=f'{day.year}/Unterlagen/{digest}{extension}.enc'
+        rid='evidence:'+digest
+        after['documents'][name]={'record_id':rid,'role':'supporting_evidence','sha256_plaintext':digest,'bytes_plaintext':len(data)}
+        after.setdefault('archive_evidence',{})[rid]=dict(raw,id=rid,documents=[name],source_sha256=digest)
+        LocalInvoices(self).commit(before,after,{name:data})
+        return {'ok':True,'changed':True,'id':rid,'documents':[name],'booked':False}
 
     def report(self, year: str | None = None) -> dict:
         self.verify()
@@ -297,20 +326,42 @@ class Archive:
         if target.exists():
             raise ValueError("Exportziel muss neu sein, damit keine alten Klartextdateien zurückbleiben")
         catalog = self.catalog()
-        rows = [v["current"] for v in catalog["records"].values() if year is None or v["current"]["year"] == year]
+        # A year is a view annotation, never a destructive archive selection.
+        rows = [v["current"] for v in catalog["records"].values()]
         exported = []
+        files = {}
+        for name, entry in catalog['documents'].items():
+            plain = name[:-4]
+            atomic(outside(self.repo, within(target, plain)), self.read(name))
+            files[name] = dict(entry, exported_path=plain)
         for row in rows:
             row = dict(row)
             row["documents"] = [name[:-4] for name in row["documents"]]
-            for name in row["documents"]:
-                path = outside(self.repo, within(target, name))
-                atomic(path, self.read(name + ".enc"))
             exported.append(row)
+        atomic(target / 'catalog.json', encoded(catalog))
+        checklist = self.repo / 'bookkeeping_checklist.json.enc'
+        if checklist.exists():
+            atomic(target / 'bookkeeping_checklist.json', unseal(self.unlock(), checklist.read_bytes(), 'bookkeeping_checklist.json'))
+        elif (self.repo / 'bookkeeping_checklist.json').exists():
+            atomic(target / 'bookkeeping_checklist.json', (self.repo / 'bookkeeping_checklist.json').read_bytes())
+        proof_dir = self.root / 'nachweise'
+        for path in proof_dir.glob('*'):
+            if path.is_file():atomic(target / 'nachweise' / path.name, path.read_bytes())
+        for name in ('workspace.json', 'tool-version.json'):
+            if (self.repo / name).exists():atomic(target / name, (self.repo / name).read_bytes())
+        for name in ('AGENTS.md','verfahrensdokumentation.md','buchhaltung/README.md','buchhaltung/AGENTS.md'):
+            if (self.repo / name).exists():atomic(target / 'dokumentation' / name,(self.repo / name).read_bytes())
+        for path in (self.repo / 'migration').rglob('*.enc'):
+            atomic(target / 'migration' / path.relative_to(self.repo / 'migration'), path.read_bytes())
+        atomic(target / 'export-manifest.json', encoded({'version':2,'scope':'complete',
+            'catalog_sha256':sha(encoded(catalog)), 'documents':files, 'view_year':year,
+            'retention_years':11, 'secrets_included':False}))
         atomic(outside(self.repo, target / "database.json"), encoded({"schema_version": 1, "records": exported,
-               "imports": catalog["imports"], "basis": "Dokumentdatum; Bruttobelegwerte, keine steuerliche EÜR"}))
+               "imports": catalog["imports"], "view_year":year,
+               "basis": "Vollständiger Bestand; Dokumentdatum und Bruttobelegwerte, keine steuerliche EÜR. Vollständige Historien/Zahlungen/Einstellungen in catalog.json."}))
         template = (__import__("autobookkeeping.workspace", fromlist=["tool_root"]).tool_root() / "scripts/archive_view.html").read_bytes()
         atomic(outside(self.repo, target / "index.html"), template)
-        return {"ok": True, "records": len(exported), "directory": str(target)}
+        return {"ok": True, "records": len(exported), "documents":len(files), "complete":True, "directory": str(target)}
 
 
 def git(repo: Path, *args: str) -> bytes:
@@ -436,9 +487,12 @@ def cd_export(archive: Archive, target: Path) -> dict:
     if (archive.repo / "migration").exists(): shutil.copytree(archive.repo / "migration", target / "migration")
     for name in (".bookkeeping-data.json", "workspace.json", "tool-version.json", "bookkeeping_checklist.json.enc"):
         if (archive.repo / name).exists(): atomic(target / name, (archive.repo / name).read_bytes())
-    for name in ("src/autobookkeeping/workspace.py", "scripts/bookkeeping_action.py", "scripts/publish_bookkeeping.py", "src/autobookkeeping/publication.py", "src/autobookkeeping/models.py", "pyproject.toml", "scripts/bookkeeping_archive.py", "scripts/local_invoice.py", "scripts/receipt.py", "scripts/homeoffice.py", "scripts/install_receipt_skill.py", "scripts/ots_windows.py", "scripts/archive_view.html", "scripts/build_bookkeeping_dashboard.py", "scripts/dashboard_view.html", "dashboard.html", "src/autobookkeeping/archive.py", "src/autobookkeeping/local_invoices.py", "src/autobookkeeping/timestamps.py", "src/autobookkeeping/taxes.py", "src/autobookkeeping/adjustments.py", "src/autobookkeeping/cashflow.py", "src/autobookkeeping/dashboard.py", "src/autobookkeeping/ledger_validation.py", "src/autobookkeeping/receipts.py", "src/autobookkeeping/homeoffice.py", "skills/beleg-import/SKILL.md", "skills/beleg-import/agents/openai.yaml"):
-        source = archive.repo / name if name == "dashboard.html" else tool / name
-        atomic(within(target, name), source.read_bytes())
+    # Include every tracked runtime module, schema, skill and procedure document.
+    names = git(tool, 'ls-files', '-z').decode().split('\0')
+    for name in names:
+        if name and (name.startswith(('src/', 'scripts/', 'skills/', 'docs/')) or name in ('pyproject.toml','README.md','LICENSE','AGENTS.md')):
+            atomic(within(target, name), (tool / name).read_bytes())
+    if (archive.repo / 'dashboard.html').exists():atomic(target / 'dashboard.html',(archive.repo / 'dashboard.html').read_bytes())
     atomic(target / "WIEDERHERSTELLUNG.txt", (
         "Verschlüsselte Buchhaltungssicherung. ENCRYPTION_PASSWORD getrennt aufbewahren!\n"
         "Python 3.11+, Git und Abhängigkeiten aus pyproject.toml werden benötigt.\n"

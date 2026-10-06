@@ -24,9 +24,14 @@ def arguments():
     p = sub.add_parser("import-local")
     p.add_argument("--metadata", type=Path, required=True)
     p.add_argument("--pdf", type=Path, action="append", required=True)
+    p = sub.add_parser("evidence", help="Abrechnung/Zahlungsnachweis/Original archivieren; keine Ausgabe buchen")
+    p.add_argument("--file", type=Path, required=True)
+    p.add_argument("--metadata", type=Path, required=True)
     sub.add_parser("verify")
     p = sub.add_parser("report")
     p.add_argument("--year")
+    p = sub.add_parser("retention", help="11-jährige Mindestaufbewahrung prüfen; keine Dateien löschen")
+    p.add_argument("--as-of")
     p = sub.add_parser("export")
     p.add_argument("--output", type=Path, required=True)
     p.add_argument("--year")
@@ -54,11 +59,17 @@ def run(args):
         result = {"ok": True}
     elif args.command == "import-local":
         result = archive.import_local(args.metadata, args.pdf)
+    elif args.command == "evidence":
+        result = archive.import_evidence(args.file, args.metadata)
     elif args.command == "verify":
         result = archive.verify()
 
     elif args.command == "report":
         result = archive.report(args.year)
+    elif args.command == "retention":
+        from autobookkeeping.retention import report
+        archive.verify()
+        result = dict(report(archive.catalog(), args.as_of), ok=True)
     elif args.command == "export":
         result = archive.export(args.output, args.year)
     elif args.command == "decrypt":
@@ -126,7 +137,7 @@ def main() -> int:
     data_root()
     (ROOT / "output").mkdir(exist_ok=True)
     proof_write = args.command == "stamp" or args.command == "timestamps" and args.action == "upgrade"
-    writes = proof_write or args.command in ("init", "import-local")
+    writes = proof_write or args.command in ("init", "import-local", "evidence")
     with Publication(ROOT, "archive " + args.command, enabled=writes, mode="proofs" if proof_write else "data") as publication:
         with FileLock(ROOT / "output/archive.lock", timeout=0):
             if (ROOT / "output/local-invoice-transaction.enc").exists():
