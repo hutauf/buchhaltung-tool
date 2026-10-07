@@ -22,6 +22,7 @@ def main():
     sub=parser.add_subparsers(dest="command",required=True)
     p=sub.add_parser("inspect",help="PDF/XML/Bild lokal lesen; XML validieren und Metadaten außerhalb vorbefüllen")
     p.add_argument("path",type=Path);p.add_argument("--output",type=Path)
+    p.add_argument('--original-id',help='Vorhandene Originalausgabe für Lieferanten-Storno/Minderung')
     p=sub.add_parser("prepare",help="Geprüfte Metadaten verschlüsselt vormerken; noch keine Ausgabe buchen")
     p.add_argument("review",type=Path);p.add_argument("--metadata",type=Path,required=True)
     sub.add_parser("list",help="Ungebuchte Belegvormerkungen anzeigen")
@@ -37,7 +38,7 @@ def main():
             if args.command=="inspect":
                 base=Path(os.environ.get("LOCALAPPDATA") or Path.home()/".cache")/"BuchhaltungTool"/"belegpruefung"
                 target=args.output or base/uuid.uuid4().hex
-                result=receipts.inspect(args.path,target)
+                result=receipts.inspect(args.path,target,args.original_id)
             elif args.command=="prepare":result=receipts.prepare(args.review,args.metadata)
             elif args.command=="book":result=receipts.book(args.id,args.revision,args.approved)
             elif args.command=="discard":result=receipts.discard(args.id)

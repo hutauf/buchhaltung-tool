@@ -22,6 +22,23 @@ Abrechnungen, Banknachweise oder zunächst ungeklärte Belege ohne Ausgabenbuchu
 
 Die Nachweismetadaten enthalten genau `date` (ISO-Datum), `description` und `verification_basis`. Dieser Archivvorgang führt die Commit-/Push-/OTS-Pipeline aus, erzeugt aber keinen EÜR-Eintrag und keinen Zahlungsfluss. Monatliche CD-Sicherung und Rückleseprüfung bleiben getrennte Arbeitsschritte.
 
+## Verkaufsabgleich, Lieferanten-Erstattungen und Sicherungsregister
+
+`buchhaltung abgleich ebay --days 90 --save` liest alle API-Seiten des gewählten Fensters, prüft SRN/Order-Aliasse und vergleicht Rechnungsbetrag und Originalbestand. Ergebnisse und empfangene API-Antworten werden verschlüsselt samt Zeitfenster gespeichert und durch die private Commit-/Push-/OTS-Pipeline veröffentlicht. Ohne `--save` ist der Aufruf nur lesend. `buchhaltung abgleich status` zeigt den letzten gespeicherten Abruf. Für einen täglichen Lauf den Speicherbefehl in den bestehenden Scheduler aufnehmen; das Tool selbst läuft nicht ständig im Hintergrund. Kein automatischer eBay-Abrechnungs-, Gebühren- oder Auszahlungsimport, keine automatische Rechnungserstellung und keine Bankabstimmung. Fehlende oder lediglich extern referenzierte Belege bleiben sichtbar.
+
+Lieferanten-Stornos und Minderungen über `buchhaltung beleg inspect PFAD` einlesen. In den geprüften Metadaten `document_type: "supplier_credit"`, `original_id` der vorhandenen Ausgabe und `correction_reason` ergänzen. Brutto/Netto/Steuer als positive Nennbeträge angeben. Der normale `prepare`-/`book --revision ... --approved`-Ablauf speichert den verknüpften Minderungsbeleg mit negativen Beträgen; die Originalausgabe und deren Nummer bleiben erhalten. Bei strukturiertem XML wird die Belegart erkannt. Eine tatsächliche Erstattung separat mit positivem Betrag und Nachweis über `zahlung erfassen` zuordnen oder beim bestätigten Eingang `pay_date`, `paid_amount` und `payment_evidence` angeben. Nur der tatsächliche Geldzufluss mindert die Zahlungs-Ausgaben. Keine eigene Rechnungsnummer wird verbraucht und keine Bankzahlung ausgeführt.
+
+```powershell
+.venv\Scripts\buchhaltung.exe sicherung export --output 'NEUER_ORDNER_AUSSERHALB'
+.venv\Scripts\buchhaltung.exe sicherung status
+.venv\Scripts\buchhaltung.exe sicherung bestaetigen --id 'BACKUP_ID_AUS_EXPORT' --directory 'PFAD_ZUM_MEDIUM' --medium 'MEDIENKENNUNG' --written --approved
+.venv\Scripts\buchhaltung.exe sicherung test --id 'BACKUP_ID_AUS_EXPORT' --directory 'PFAD_ZUM_MEDIUM'
+```
+
+Der Export registriert nur einen vorbereiteten Snapshot. Das Medium erst nach tatsächlichem Schreiben und Abschließen bestätigen; die Bestätigung liest sämtliche Paketdateien vom angegebenen Medium und vergleicht den registrierten Manifesthash. Der Exportordner selbst ist dafür kein zulässiges Rückleseziel. Es gibt keine automatische Brennererkennung. `sicherung test` stellt beide Git-Bundles isoliert außerhalb der Repos wieder her, prüft Git-Objekte, Archiv/Originale und historische Gitnachweise und erhält das Ergebnis im verschlüsselten Register. Neuinstallation der Abhängigkeiten und erneute Bitcoin-Verifikation sind gesonderte Tests. Ein fertiger, noch nicht registrierter Export lässt sich mit `sicherung registrieren ORDNER` eintragen.
+
+Das Offline-Dashboard zeigt den letzten API-Abgleich, monatlichen Sicherungsbedarf, Registerstände und Bitcoin-Nachweisstatus. Es zeigt passende Befehle; API-/Medienaktionen führt es nicht aus. `veroeffentlichen confirm` erhält erfolgreiche Bitcoin-Prüfungen in einem an genaue Datei-Hashes gebundenen privaten Cache und aktualisiert das Dashboard. Öffentliche Verfahrensbeschreibung und private Betriebsangaben werden bei jeder Funktionsänderung mitgepflegt. Offene betriebliche Zuständigkeiten bleiben offen.
+
 ## Technische Protokolle und Prüfexport
 
 Katalogänderungen werden automatisch in einem verschlüsselten, verketteten Änderungsprotokoll gespeichert. Vorherige Werte, Änderungszeitpunkt und Toolrevision bleiben prüfbar. Vorhandene Originaldateien und ihre Inventar-Prüfsummen dürfen die Helfer nicht überschreiben oder entfernen. Die Veröffentlichung speichert außerdem die tatsächlich bestandene technische Archivprüfung. Das belegt keinen vollständigen Quellenabgleich.

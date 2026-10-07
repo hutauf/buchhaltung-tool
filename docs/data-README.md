@@ -35,7 +35,7 @@ Schreibende Helfer veröffentlichen nur das private Repo: Archivprüfung, Dashbo
 
 ```powershell
 .venv\Scripts\python.exe -X utf8 scripts\bookkeeping_archive.py export --output 'PFAD_AUSSERHALB_BEIDER_REPOS'
-.venv\Scripts\python.exe -X utf8 scripts\bookkeeping_archive.py cd-export --output 'NEUER_CD_EXPORTORDNER'
+.venv\Scripts\python.exe -X utf8 -m autobookkeeping.cli sicherung export --output 'NEUER_CD_EXPORTORDNER'
 .venv\Scripts\python.exe -X utf8 scripts\bookkeeping_archive.py cd-verify 'CD_EXPORTORDNER'
 ```
 

@@ -15,8 +15,9 @@ from autobookkeeping.dashboard import html, index_blob, index_catalog, projectio
 CODE = ["scripts/build_bookkeeping_dashboard.py", "scripts/dashboard_view.html",
         "scripts/bookkeeping_action.py", "scripts/publish_bookkeeping.py", "scripts/homeoffice.py",
         "scripts/receipt.py", "scripts/local_invoice.py", "scripts/bookkeeping_archive.py",
+        "scripts/backup_register.py", "scripts/reconcile_ebay.py",
         *["src/autobookkeeping/"+name+".py" for name in
-          ("__init__", "workspace", "archive", "audit_trail", "inspection_export", "checklist", "handover", "dashboard", "adjustments", "cashflow", "local_invoices", "taxes", "ledger_validation", "receipts", "einvoices", "retention", "homeoffice", "publication", "timestamps", "models")]]
+          ("__init__", "workspace", "archive", "audit_trail", "inspection_export", "backups", "reconciliation", "checklist", "handover", "dashboard", "adjustments", "cashflow", "local_invoices", "taxes", "ledger_validation", "receipts", "einvoices", "retention", "homeoffice", "publication", "timestamps", "models")]]
 
 
 def git(repo, *args):
@@ -34,7 +35,7 @@ def build(repo: Path, staged=False, check=False, tool=None):
         changed = git(repo, "diff", "--cached", "--name-only", "-z").decode().split("\0")
         if any(n == ".env" or n.startswith(".env.") for n in changed):
             raise ValueError("Passwort-/Zugangsdaten dürfen nicht eingecheckt werden")
-        relevant = any(n in CODE or n == "dashboard.html" or n.startswith("buchhaltung/") and not n.startswith("buchhaltung/nachweise/") and n not in ("buchhaltung/README.md", "buchhaltung/AGENTS.md") for n in changed)
+        relevant = any(n in CODE or n in ("dashboard.html", "timestamp-status.json") or n.startswith("buchhaltung/") and not n.startswith("buchhaltung/nachweise/") and n not in ("buchhaltung/README.md", "buchhaltung/AGENTS.md") for n in changed)
         if not relevant and not check:
             return {"skipped": True}
         from autobookkeeping.workspace import assert_tool_clean
@@ -49,7 +50,10 @@ def build(repo: Path, staged=False, check=False, tool=None):
         archive = Archive(repo); archive.verify(); catalog = archive.catalog()
         digest = sha((archive.root / "database.json.enc").read_bytes())
         template = (tool / "scripts/dashboard_view.html").read_bytes()
-    data = html(projection(catalog, digest), template)
+    from autobookkeeping.timestamps import dashboard_status
+    snapshot=projection(catalog,digest)
+    snapshot['timestamps']=dashboard_status(repo,staged)
+    data = html(snapshot, template)
     existing = target.read_bytes() if target.exists() else None
     if check:
         if existing != data or staged and index_blob(repo, "dashboard.html") != data:

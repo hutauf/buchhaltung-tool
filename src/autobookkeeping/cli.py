@@ -12,7 +12,8 @@ ROUTES = {
     "archiv": ("bookkeeping_archive.py", [], "Verschluesseltes Archiv und Klartextexport ausserhalb des Repos"),
     "pruefen": ("bookkeeping_archive.py", ["verify"], "Archivintegritaet pruefen"),
     "dashboard": ("build_bookkeeping_dashboard.py", [], "Anonymisierte HTML-Uebersicht erzeugen"),
-    "sicherung": ("bookkeeping_archive.py", [], "Sicherung exportieren, pruefen oder wiederherstellen"),
+    "sicherung": ("backup_register.py", [], "Sicherungsregister: exportieren, Medium bestaetigen, Restore testen"),
+    "abgleich": ("reconcile_ebay.py", [], "Vollstaendiger eBay-Verkaufsabgleich ohne Gebuehrenimport"),
     "veroeffentlichen": ("publish_bookkeeping.py", [], "Git-/Zeitnachweis-Pipeline pruefen und fortsetzen"),
     "homeoffice": ("homeoffice.py", [], "Homeoffice-Tage pruefen und nach Freigabe speichern"),
     "ebay": ("get_ebay_orders.py", [], "eBay-Bestellungen lesen"),
@@ -34,12 +35,11 @@ def command(argv):
             raise ValueError("zahlung: erfassen oder berichtigen angeben")
         tail = [aliases[tail[0]], *tail[1:]]
     if group == "sicherung":
-        aliases = {"export":"cd-export", "pruefen":"cd-verify", "wiederherstellen":None}
-        if not tail or tail[0] not in aliases:
+        actions = {"export","pruefen","registrieren","bestaetigen","test","status","wiederherstellen"}
+        if not tail or tail[0] not in actions:
             if tail in ([], ["--help"], ["-h"]): return None
-            raise ValueError("sicherung: export, pruefen oder wiederherstellen angeben")
+            raise ValueError("sicherung: export, pruefen, registrieren, bestaetigen, test, status oder wiederherstellen angeben")
         if tail[0] == "wiederherstellen": script = "restore_backup.py"; tail = tail[1:]
-        else: tail = [aliases[tail[0]], *tail[1:]]
     return script, [*prefix, *tail]
 
 
@@ -54,7 +54,7 @@ def main(argv=None):
     except ValueError as exc: parser.error(str(exc))
     if route is None:
         print("buchhaltung zahlung erfassen --metadata DATEI --approved\nbuchhaltung zahlung berichtigen ID --reason GRUND --approved" if argv[0] == "zahlung" else
-              "buchhaltung sicherung export --output NEUER_ORDNER\nbuchhaltung sicherung pruefen ORDNER\nbuchhaltung sicherung wiederherstellen ORDNER --password-file ENV --output NEUER_ORDNER")
+              "buchhaltung sicherung export --output NEUER_ORDNER\nbuchhaltung sicherung status\nbuchhaltung sicherung bestaetigen --id ID --directory MEDIUM --medium NAME --written --approved\nbuchhaltung sicherung test --id ID --directory MEDIUM\nbuchhaltung sicherung pruefen ORDNER\nbuchhaltung sicherung wiederherstellen ORDNER --password-file ENV --output NEUER_ORDNER")
         return 0
     script, arguments = route
     tool = Path(__file__).resolve().parents[2]

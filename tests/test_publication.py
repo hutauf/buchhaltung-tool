@@ -192,6 +192,19 @@ def test_proof_only_update_is_committed_without_recursive_stamp(fixture):
     assert sha((archive.root / 'database.json.enc').read_bytes()) == before
 
 
+def test_verification_cache_and_dashboard_publish_without_new_data_timestamp(fixture):
+    from autobookkeeping.archive import atomic, encoded
+    repo,archive,git=fixture;result=save(repo,archive)
+    before=sha((archive.root/'database.json.enc').read_bytes())
+    with Publication(repo,'cache verification',mode='proofs') as publication:
+        atomic(repo/'timestamp-status.json',encoded({'version':1,'entries':{}}))
+    assert publication.result['status']=='proofs_published'
+    assert sha((archive.root/'database.json.enc').read_bytes())==before
+    assert git('rev-list','--count','HEAD')=='4'
+    assert len(list((archive.root/'nachweise').glob('*.json')))==1
+    assert 'timestamp-status.json' in git('diff-tree','--no-commit-id','--name-only','-r','HEAD')
+
+
 def test_encrypted_journal_recovery_then_publication(fixture, monkeypatch):
     repo, archive, git = fixture; original = archive.save_catalog
     monkeypatch.setattr(archive, 'save_catalog', lambda *args: (_ for _ in ()).throw(OSError('Power loss while saving')))

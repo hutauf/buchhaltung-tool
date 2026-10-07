@@ -33,6 +33,8 @@ def public_day(value):
 
 
 def projection(catalog: dict, source_digest: str) -> dict:
+    from autobookkeeping.backups import public_status as backup_status
+    from autobookkeeping.reconciliation import public_status as reconcile_status
     rows=[]
     values=[("records", v["current"]) for v in catalog["records"].values()]
     values += [(section, v["current"]) for section in ("local_invoice_drafts","local_adjustment_drafts","local_expense_drafts")
@@ -46,7 +48,7 @@ def projection(catalog: dict, source_digest: str) -> dict:
         elif section == "local_adjustment_drafts":
             from autobookkeeping.adjustments import Adjustments
             proposal = Adjustments.summary(row, catalog)["proposed_number"]
-        if kind not in ("invoice", "expense", "credit_note", "correction", "draft"):
+        if kind not in ("invoice", "expense", "expense_credit", "credit_note", "correction", "draft"):
             raise ValueError("Unbekannte Belegart im Dashboard")
         if row.get("currency", "EUR") != "EUR":
             raise ValueError("Fremdwährungsbestand benötigt eine gesonderte Auswertung")
@@ -77,13 +79,13 @@ def projection(catalog: dict, source_digest: str) -> dict:
         result={"ref":sha(rid.encode())[:20],"date":public_day(row.get("date")),
                 "kind":kind,"number":public_number(row.get("document_number") or row.get("number")),
                 "proposed_number":public_number(proposal),
-                "document_type":row.get("document_type") if row.get("document_type") in ("invoice","cancellation","partial_refund","correction","expense") else "invoice" if section == "local_invoice_drafts" else kind,
+                "document_type":row.get("document_type") if row.get("document_type") in ("invoice","cancellation","partial_refund","correction","expense","supplier_credit") else "invoice" if section == "local_invoice_drafts" else kind,
                 "related_number":public_number(row.get("original_number")),"status":status if status in
                     ("paid","issued","recorded","cancelled","locally_cancelled","partially_credited","test_draft","draft") else "other",
                 "gross_cents":gross,"net_cents":monetary("net"),"vat_cents":monetary("vat"),
                 "vat_rates":[float(r) for r in rates if isinstance(r,(int,float)) and 0<=r<=100],
                 "tax_treatment":tax_treatment,
-                "expense_category":row.get("category") if row.get("kind")=="expense" and row.get("category") in CATEGORIES else None,
+                "expense_category":row.get("category") if row.get("kind") in ("expense","expense_credit") and row.get("category") in CATEGORIES else None,
                 "coverage":"complete" if row.get("coverage")=="complete" or kind=="draft" else "missing",
                 "source":"local" if row.get("source")=="local" else "imported",
                 "flows":flows,"warnings":sorted(set(warnings)),"document_effect_cents":effect}
@@ -92,8 +94,9 @@ def projection(catalog: dict, source_digest: str) -> dict:
         rows.append(result)
     rows.sort(key=lambda r:(r["date"] or "",r["ref"]))
     return {"schema_version":1,"source_sha256":source_digest,"timezone":"Europe/Berlin","currency":"EUR",
+            "backups":backup_status(catalog), "reconciliation":reconcile_status(catalog),
             "basis":"Erfasste Zahlungsbewegungen; Belegbeträge getrennt. Arbeitsübersicht, keine vollständige steuerliche EÜR.",
-            "gaps":["eBay-Abrechnungen, Gebühren und tatsächliche Verfügbarkeit abgleichen",
+            "gaps":["Erfasste Verkäufe mit eBay-API abgleichen; tatsächliche Zahlungsverfügbarkeit gesondert prüfen. Kein automatischer Gebührenimport.",
                     "Warenzugänge/Vine, Privatentnahmen und weitere Betriebseinnahmen/-ausgaben ergänzen",
                     "Anlagevermögen/AfA, Steuerzahlungen und Ausnahmen am Jahreswechsel gesondert zuordnen"],"rows":rows,
             "homeoffice": public_allowances(catalog), "homeoffice_default_days": DEFAULT_DAYS,

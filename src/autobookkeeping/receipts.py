@@ -34,12 +34,12 @@ def existing(catalog, digest, metadata=None):
         hashes={catalog["documents"][n]["sha256_plaintext"] for n in row["documents"]}
         if digest in hashes:
             hard.append(rid);continue
-        if metadata and row["kind"]=="expense" and normalized(supplier(row))==normalized(metadata["payee"]):
+        if metadata and row["kind"] in ("expense", "expense_credit") and normalized(supplier(row))==normalized(metadata["payee"]):
             same_number=metadata.get("number") and normalized(row.get("number"))==normalized(metadata["number"])
             same_context=(row.get("date","")[:10]==metadata["date"] and row.get("gross")==metadata["gross"])
             if same_number:
                 hard.append(rid)
-            elif same_context:
+            elif same_context and rid != metadata.get('original_id'):
                 possible.append(rid)
     return {"existing_records":sorted(hard), "possible_duplicates":sorted(possible)}
 
@@ -61,8 +61,9 @@ def match_structured(metadata, result):
     if not result: return
     if not result['validation']['en16931_valid']:
         raise WorkflowError('Rechnungs-XML ungültig; Original als Nachweis archivieren und Quelle klären')
-    if result['document_type'] != 'invoice':
-        raise WorkflowError('Lieferanten-Korrekturbeleg separat zuordnen; nicht als positive Ausgabe buchen')
+    expected = 'credit_note' if metadata.get('document_type') == 'supplier_credit' else 'invoice'
+    if result['document_type'] != expected:
+        raise WorkflowError('XML-Belegart passt nicht zu Ausgabe/Lieferanten-Korrektur')
     source = result['metadata']
     for field in ('payee', 'number', 'date', 'currency', 'supplier_country', 'vat_rate'):
         if metadata.get(field) != source.get(field):
@@ -81,7 +82,8 @@ def validate_metadata(raw):
     result=copy.deepcopy(raw)
     allowed={"payee","number","date","currency","gross","net","vat","vat_rate","vat_breakdown","tax_treatment",
              "tax_review_required","tax_review_note","description","category","pay_date","paid_amount","payment_evidence",
-             "service_period_start","service_period_end","supplier_country","business_use","verification_basis","duplicate_review"}
+             "service_period_start","service_period_end","supplier_country","business_use","verification_basis","duplicate_review",
+             "document_type","original_id","correction_reason"}
     if set(result)-allowed:raise WorkflowError("Unbekannte Metadatenfelder; keine eigenen IDs oder Buchungsstatus setzen")
     for field in ("payee","description","verification_basis"):
         if not isinstance(result.get(field),str) or not result[field].strip():
@@ -99,6 +101,13 @@ def validate_metadata(raw):
     if result.get("business_use") not in ("business","mixed","unclear"):raise WorkflowError("Betriebliche Nutzung ausdrücklich zuordnen")
     if result.get("number") is not None and (not isinstance(result["number"],str) or not result["number"].strip()):
         raise WorkflowError("Lieferanten-Belegnummer als Text oder null angeben")
+    if result.get('document_type', 'expense') not in ('expense', 'supplier_credit'):
+        raise WorkflowError('Ausgabe oder Lieferanten-Korrektur auswählen')
+    if result.get('document_type') == 'supplier_credit':
+        if not all(isinstance(result.get(k),str) and result[k].strip() for k in ('original_id','correction_reason')):
+            raise WorkflowError('Lieferanten-Korrektur benötigt Originalausgabe und konkreten Grund')
+    elif result.get('original_id') or result.get('correction_reason'):
+        raise WorkflowError('Originalbezug nur für Lieferanten-Korrekturen angeben')
     if result.get("supplier_country") is not None and not re.fullmatch(r"[A-Z]{2}",result["supplier_country"]):
         raise WorkflowError("Lieferantenland als ISO-Code oder null angeben")
     if result.get("supplier_country") not in (None,"DE") or result["tax_treatment"]=="special_review":
@@ -141,11 +150,50 @@ def validate_metadata(raw):
     return result
 
 
+def check_credit(catalog, metadata):
+    if metadata.get('document_type') != 'supplier_credit':
+        return None
+    original = catalog.get('records', {}).get(metadata['original_id'], {}).get('current', {})
+    if original.get('kind') != 'expense' or original.get('status') in ('draft','test_draft','cancelled'):
+        raise WorkflowError('Lieferanten-Korrektur benötigt eine bereits erfasste Originalausgabe')
+    if not supplier(original) or normalized(supplier(original)) != normalized(metadata['payee']):
+        raise WorkflowError('Lieferant der Korrektur stimmt nicht mit Originalausgabe überein')
+    if original.get('currency','EUR') != metadata['currency'] or metadata['date'] < original['date'][:10]:
+        raise WorkflowError('Währung oder Datum der Lieferanten-Korrektur passt nicht zum Original')
+    credits = [v['current'] for v in catalog['records'].values()
+               if v['current'].get('kind') == 'expense_credit' and v['current'].get('original_id') == original['id']]
+    for field in ('gross','net','vat'):
+        if original.get(field) is None or sum((-Decimal(c[field]) for c in credits), Decimal(0)) + Decimal(metadata[field]) > Decimal(original[field]):
+            raise WorkflowError('Lieferanten-Minderung übersteigt verbleibenden Originalbetrag/Steuer')
+    original_rates = {g['vat_rate'] for g in original.get('vat_breakdown', [])}
+    if original.get('vat_rate') is not None: original_rates.add(original['vat_rate'])
+    credit_rates = {g['vat_rate'] for g in metadata.get('vat_breakdown', [])}
+    if metadata.get('vat_rate') is not None: credit_rates.add(metadata['vat_rate'])
+    if original_rates and not credit_rates <= original_rates:
+        raise WorkflowError('Steuersatz der Lieferanten-Korrektur passt nicht zum Original')
+    if original.get('vat_breakdown'):
+        if not metadata.get('vat_breakdown'):
+            raise WorkflowError('Korrektur einer gruppierten Steuerrechnung benötigt dieselbe Steuergruppenaufteilung')
+        for group in metadata.get('vat_breakdown', []):
+            for field in ('gross','net','vat'):
+                available = sum((Decimal(g[field]) for g in original['vat_breakdown'] if g['vat_rate']==group['vat_rate']),Decimal(0))
+                used = sum((-Decimal(g[field]) for c in credits for g in c.get('vat_breakdown',[]) if g['vat_rate']==group['vat_rate']),Decimal(0))
+                if used + Decimal(group[field]) > available:
+                    raise WorkflowError('Steuergruppen-Minderung übersteigt verbleibende Originalgruppe')
+    return original
+
+
+def check_structured_original(original, structured):
+    references = structured.get('original_numbers', []) if structured else []
+    if original and references and (len(set(references)) != 1 or normalized(original.get('number')) != normalized(references[0])):
+        raise WorkflowError('Originalbezug der Lieferanten-XML passt nicht zur ausgewählten Ausgabe')
+
+
 class Receipts:
     def __init__(self,workflow:LocalInvoices):
         self.workflow=workflow;self.archive=workflow.archive
 
-    def inspect(self,source:Path,target:Path):
+    def inspect(self,source:Path,target:Path,original_id=None):
         import pymupdf
         source=source.resolve();target=outside(self.archive.repo,target)
         if target.exists():raise WorkflowError("Prüfordner muss neu sein")
@@ -193,6 +241,12 @@ class Receipts:
                   "vat_rate":None,"tax_treatment":None,"tax_review_required":False,"description":None,"category":None,
                   "supplier_country":None,"business_use":None,"pay_date":None,"verification_basis":None}
         if structured and structured.get('metadata'):template.update(structured['metadata'])
+        if structured and structured.get('document_type') == 'credit_note':
+            template.update(document_type='supplier_credit', original_id=None, correction_reason=None)
+        if original_id:
+            original=catalog.get('records',{}).get(original_id,{}).get('current',{})
+            if original.get('kind')!='expense': raise WorkflowError('Lieferanten-Korrektur benötigt vorhandene Originalausgabe')
+            template.update(document_type='supplier_credit', original_id=original_id, correction_reason=None)
         atomic(target/"metadaten.json",encoded(template))
         return {"ok":True,"review":str(target/"review.json"),"metadata":str(target/"metadaten.json"),"text":str(target/"text.txt"),
                 "pages":count,"images":[str(target/f"seite-{i+1:03d}.png") for i in pages],"source_relocated_outside":relocated,
@@ -210,6 +264,8 @@ class Receipts:
         xml, structured = structured_source(data, review['extension'])
         match_structured(metadata, structured)
         self.archive.verify();before=self.archive.catalog();after=copy.deepcopy(before)
+        original_row = check_credit(after, metadata)
+        check_structured_original(original_row, structured)
         duplicates=existing(after,digest,metadata)
         if duplicates["existing_records"]:raise WorkflowError("Beleg bereits archiviert; vorhandenen Datensatz verwenden")
         if duplicates["possible_duplicates"] and not str(metadata.get("duplicate_review") or "").strip():
@@ -224,9 +280,11 @@ class Receipts:
             raise WorkflowError("Vorhandener verschlüsselter Originalbeleg passt nicht zur Prüfung")
         if not name or not name.startswith(year+"/Ausgaben/"):
             name=f"{year}/Ausgaben/{digest}{review['extension']}.enc";documents[name]=data
-        candidate=dict(metadata,id=did,kind="expense",document_type="expense",status="test_draft",source="local",year=year,
+        candidate=dict(metadata,id=did,kind="expense",document_type=metadata.get('document_type','expense'),status="test_draft",source="local",year=year,
                        number=metadata.get("number"),documents=[name],coverage="complete",source_sha256=digest,
                        duplicate_candidates=duplicates["possible_duplicates"],metadata=metadata)
+        if original_row:
+            candidate.update(original_revision=sha(encoded(original_row)), original_number=original_row.get('number'))
         if structured:
             candidate['structured_invoice'] = structured
             extras=[('validation.json',encoded(structured),'e_invoice_validation')]
@@ -266,6 +324,10 @@ class Receipts:
         original_name=candidate['documents'][0]
         _, structured = structured_source(self.archive.read(original_name),Path(original_name[:-4]).suffix.lower())
         match_structured(metadata, structured)
+        original_row = check_credit(after, metadata)
+        check_structured_original(original_row, structured)
+        if original_row and sha(encoded(original_row)) != candidate['original_revision']:
+            raise WorkflowError('Originalausgabe geändert; Lieferanten-Korrektur erneut prüfen')
         dhl_guard(after,digest)
         if existing(after,digest,metadata)["existing_records"]:raise WorkflowError("Zwischenzeitlich als Ausgabe/anderer Beleg archiviert")
         possible=existing(after,digest,metadata)["possible_duplicates"]
@@ -275,11 +337,19 @@ class Receipts:
                  number=metadata.get("number"),documents=candidate["documents"],coverage="complete",vat_basis="reviewed_original_receipt",
                  source_record=metadata,recorded_at=now(),approved_revision=revision)
         row["provenance"] = copy.deepcopy(candidate["provenance"])
+        if original_row:
+            row.update(kind='expense_credit', document_type='supplier_credit', original_id=metadata['original_id'],
+                       original_number=original_row.get('number'), original_revision=candidate['original_revision'])
+            for field in ('gross','net','vat'): row[field]=str(-Decimal(row[field]))
+            if row.get('vat_breakdown'):
+                row['vat_breakdown'] = copy.deepcopy(row['vat_breakdown'])
+                for group in row['vat_breakdown']:
+                    for field in ('gross','net','vat'): group[field]=str(-Decimal(group[field]))
         if candidate.get('structured_invoice'):
             row['structured_invoice'] = copy.deepcopy(candidate['structured_invoice'])
         after["records"][rid]={"current":row,"history":[]}
         value["history"].append(copy.deepcopy(candidate));value["current"]=dict(candidate,status="recorded",record_id=rid,booked_at=now())
-        after.setdefault("local_events",[]).append({"action":"expense_receipt","record_id":rid,"approved_revision":revision,"at":now()})
+        after.setdefault("local_events",[]).append({"action":"supplier_credit" if original_row else "expense_receipt","record_id":rid,"approved_revision":revision,"at":now()})
         self.workflow.commit(before,after,{})
         return {"ok":True,"changed":True,"record_id":rid,"gross":row["gross"],"pay_date":row.get("pay_date")}
 

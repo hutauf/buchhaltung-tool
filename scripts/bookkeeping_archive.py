@@ -116,8 +116,9 @@ def run(args):
             result.append(entry)
         return {"ok": not failed, "timestamps": result}
     elif args.command == "cd-export":
-        result = cd_export(archive, args.output)
-        cd_verify(args.output)
+        from autobookkeeping.backups import export
+        from autobookkeeping.local_invoices import LocalInvoices
+        result = export(LocalInvoices(archive), args.output)
     elif args.command == "cd-verify":
         result = cd_verify(args.directory)
     elif args.command == "restore-bundle":
@@ -137,7 +138,7 @@ def main() -> int:
     data_root()
     (ROOT / "output").mkdir(exist_ok=True)
     proof_write = args.command == "stamp" or args.command == "timestamps" and args.action == "upgrade"
-    writes = proof_write or args.command in ("init", "import-local", "evidence")
+    writes = proof_write or args.command in ("init", "import-local", "evidence", "cd-export")
     with Publication(ROOT, "archive " + args.command, enabled=writes, mode="proofs" if proof_write else "data") as publication:
         with FileLock(ROOT / "output/archive.lock", timeout=0):
             if (ROOT / "output/local-invoice-transaction.enc").exists():

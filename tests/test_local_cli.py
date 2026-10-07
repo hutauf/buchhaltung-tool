@@ -19,8 +19,10 @@ from autobookkeeping.local_invoices import WorkflowError
     (['zahlung','erfassen','--metadata','synthetic.json','--approved'],'local_invoice.py',['cash-record','--metadata','synthetic.json','--approved']),
     (['zahlung','berichtigen','synthetic-id','--reason','Synthetic mistake','--approved'],'local_invoice.py',['cash-void','synthetic-id','--reason','Synthetic mistake','--approved']),
     (['pruefen'],'bookkeeping_archive.py',['verify']),
-    (['sicherung','export','--output','outside'],'bookkeeping_archive.py',['cd-export','--output','outside']),
-    (['sicherung','pruefen','outside'],'bookkeeping_archive.py',['cd-verify','outside']),
+    (['sicherung','export','--output','outside'],'backup_register.py',['export','--output','outside']),
+    (['sicherung','pruefen','outside'],'backup_register.py',['pruefen','outside']),
+    (['sicherung','status'],'backup_register.py',['status']),
+    (['abgleich','ebay','--save'],'reconcile_ebay.py',['ebay','--save']),
     (['sicherung','wiederherstellen','outside'],'restore_backup.py',['outside']),
     (['veroeffentlichen','resume'],'publish_bookkeeping.py',['resume']),
 ])

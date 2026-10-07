@@ -365,7 +365,7 @@ class Archive:
         proof_dir = self.root / 'nachweise'
         for path in proof_dir.glob('*'):
             if path.is_file():atomic(target / 'nachweise' / path.name, path.read_bytes())
-        for name in ('workspace.json', 'tool-version.json'):
+        for name in ('workspace.json', 'tool-version.json', 'timestamp-status.json'):
             if (self.repo / name).exists():atomic(target / name, (self.repo / name).read_bytes())
         for name in ('AGENTS.md','verfahrensdokumentation.md','buchhaltung/README.md','buchhaltung/AGENTS.md'):
             if (self.repo / name).exists():atomic(target / 'dokumentation' / name,(self.repo / name).read_bytes())
@@ -484,7 +484,7 @@ def cd_export(archive: Archive, target: Path) -> dict:
     if target.exists():
         raise ValueError("CD-Exportziel muss neu sein")
     # Require committed current archive including proofs.
-    if git(archive.repo, "status", "--porcelain", "--", "buchhaltung", "migration", "workspace.json", "tool-version.json", "bookkeeping_checklist.json.enc").strip():
+    if git(archive.repo, "status", "--porcelain", "--", "buchhaltung", "migration", "workspace.json", "tool-version.json", "bookkeeping_checklist.json.enc", "timestamp-status.json", "verfahrensdokumentation.md", "AGENTS.md", "README.md", "dashboard.html").strip():
         raise ValueError("Buchhaltung und Nachweise zuerst committen")
     import shutil
     target.mkdir(parents=True)
@@ -504,7 +504,7 @@ def cd_export(archive: Archive, target: Path) -> dict:
     git(tool, "bundle", "create", str(target / "tool.bundle"), "--all")
     atomic(target / 'scripts/restore_backup.py', (tool / 'scripts/restore_backup.py').read_bytes())
     if (archive.repo / "migration").exists(): shutil.copytree(archive.repo / "migration", target / "migration")
-    for name in (".bookkeeping-data.json", "workspace.json", "tool-version.json", "bookkeeping_checklist.json.enc"):
+    for name in (".bookkeeping-data.json", "workspace.json", "tool-version.json", "bookkeeping_checklist.json.enc", "timestamp-status.json", "verfahrensdokumentation.md", "AGENTS.md", "README.md"):
         if (archive.repo / name).exists(): atomic(target / name, (archive.repo / name).read_bytes())
     # Include every tracked runtime module, schema, skill and procedure document.
     names = git(tool, 'ls-files', '-z').decode().split('\0')
@@ -512,6 +512,10 @@ def cd_export(archive: Archive, target: Path) -> dict:
         if name and (name.startswith(('src/', 'scripts/', 'skills/', 'docs/')) or name in ('pyproject.toml','README.md','LICENSE','AGENTS.md')):
             atomic(within(target, name), (tool / name).read_bytes())
     if (archive.repo / 'dashboard.html').exists():atomic(target / 'dashboard.html',(archive.repo / 'dashboard.html').read_bytes())
+    from autobookkeeping.local_invoices import now
+    atomic(target / 'BACKUP.json', encoded({'version':1, 'prepared_at':now(),
+           'data_commit':git(archive.repo,'rev-parse','HEAD').decode().strip(),
+           'tool_commit':git(tool,'rev-parse','HEAD').decode().strip()}))
     atomic(target / "WIEDERHERSTELLUNG.txt", (
         "Verschlüsselte Buchhaltungssicherung. ENCRYPTION_PASSWORD getrennt aufbewahren!\n"
         "Python 3.11+, Git und Abhängigkeiten aus pyproject.toml werden benötigt.\n"

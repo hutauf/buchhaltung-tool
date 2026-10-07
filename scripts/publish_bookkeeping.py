@@ -9,7 +9,8 @@ TOOL = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(TOOL / "src"))
 from autobookkeeping.workspace import data_root
 ROOT = TOOL / "daten"
-from autobookkeeping.archive import verify_checkpoint
+from autobookkeeping.archive import verify_checkpoint, atomic, encoded, sha
+from autobookkeeping.local_invoices import now
 from autobookkeeping.publication import resume, Publication
 from autobookkeeping.timestamps import verify_public, status
 from autobookkeeping.local_invoices import WorkflowError
@@ -17,7 +18,7 @@ from autobookkeeping.local_invoices import WorkflowError
 
 def confirm():
     with Publication(ROOT, "confirm Bitcoin timestamps", mode="proofs") as publication:
-        results = []; changed = []
+        results = []; changed = []; cache={'version':1,'entries':{}}
         for statement in sorted((ROOT / "buchhaltung/nachweise").glob("*.json")):
             proof = Path(str(statement) + ".ots"); before = proof.read_bytes()
             run = subprocess.run([sys.executable, str(TOOL / "scripts/ots_windows.py"), "upgrade", str(proof)],
@@ -29,7 +30,13 @@ def confirm():
                     verify_checkpoint(ROOT, statement); entry.update(verify_public(statement, proof))
                 except Exception: entry["verification_pending"] = True
             if run.returncode: entry["upgrade_pending"] = True
+            cache['entries'][statement.stem] = {
+                'checked_at':now(), 'statement_sha256':sha(statement.read_bytes()),'proof_sha256':sha(proof.read_bytes()),
+                'blockchain_verified':entry['blockchain_verified'],
+                'verification_mode':entry.get('verification_mode'), 'block_height':entry.get('block_height'),
+                'block_time_utc':entry.get('block_time_utc'), 'confirmations':entry.get('confirmations')}
             results.append(entry)
+        atomic(ROOT/'timestamp-status.json',encoded(cache))
     return {"ok": True, "timestamps": results, "upgraded_proofs": len(changed), "publication": publication.result}
 
 

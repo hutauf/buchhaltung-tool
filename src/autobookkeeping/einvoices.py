@@ -115,6 +115,7 @@ def inspect_xml(data: bytes):
                   'supplier_country': text(supplier, 'cac:PostalAddress/cac:Country/cbc:IdentificationCode')}
         names = root.xpath('//cac:Item/cbc:Name/text()', namespaces=NS)
         document_type = 'credit_note' if kind == 'ubl-creditnote' else 'invoice'
+        original_numbers = root.xpath('cac:BillingReference/cac:InvoiceDocumentReference/cbc:ID/text()', namespaces=NS)
     else:
         trade = root.find('rsm:SupplyChainTradeTransaction', NS)
         supplier = trade.find('ram:ApplicableHeaderTradeAgreement/ram:SellerTradeParty', NS)
@@ -131,6 +132,7 @@ def inspect_xml(data: bytes):
                   'supplier_country': text(supplier,'ram:PostalTradeAddress/ram:CountryID')}
         names = root.xpath('//ram:SpecifiedTradeProduct/ram:Name/text()',namespaces=NS)
         document_type = 'credit_note' if text(root,'rsm:ExchangedDocument/ram:TypeCode')=='381' else 'invoice'
+        original_numbers = settlement.xpath('ram:InvoiceReferencedDocument/ram:IssuerAssignedID/text()', namespaces=NS)
     if not validation['en16931_valid']:
         return {'validation': validation, 'metadata': None, 'document_type': document_type}
     for g in groups:
@@ -146,6 +148,7 @@ def inspect_xml(data: bytes):
         description=' · '.join(names)[:1000] or 'Strukturierter Rechnungsbeleg', category=None, business_use=None,
         pay_date=None, verification_basis=None)
     return {'validation': validation, 'metadata': values, 'document_type': document_type,
+            'original_numbers': original_numbers,
             'tax_categories': sorted({g['category'] for g in groups})}
 
 

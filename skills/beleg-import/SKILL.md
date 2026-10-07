@@ -1,6 +1,6 @@
 ---
 name: beleg-import
-description: Lies einen vorhandenen PDF-, XML-, PNG- oder JPEG-Ausgabenbeleg aus einem lokalen Pfad, prüfe seine Metadaten mit dem Nutzer und archiviere ihn nach Freigabe verschlüsselt im Buchhaltungsrepository. Für Abos, eBay-Gebühren, Einkäufe und sonstige Kosten; nicht zum Ausstellen eigener Rechnungen oder zum Ausführen von Zahlungen.
+description: Lies einen vorhandenen PDF-, XML-, PNG- oder JPEG-Kostenbeleg oder Lieferanten-Storno aus einem lokalen Pfad, prüfe Metadaten und Originalbezug mit dem Nutzer und archiviere ihn nach Freigabe verschlüsselt. Für Abos, einzeln eingereichte Gebühren, Einkäufe und Erstattungen; nicht zum Ausstellen eigener Rechnungen oder Ausführen von Zahlungen.
 ---
 
 # Ausgabenbeleg importieren
@@ -19,7 +19,9 @@ Der Helfer erzeugt einen zufälligen Prüfordner **außerhalb** des Repos mit un
 
 Bei eigenständiger UBL-/CII-XML oder Rechnungs-XML im PDF validiert der Helfer lokal XSD und CEN-EN16931-Regeln. `strukturierte-daten.json` lesen; gültige XML befüllt die finanzielle Vorlage automatisch. PDF-Anzeige und XML vergleichen, Abweichungen ausdrücklich melden. Der strukturierte Teil ist die maßgebliche Datenquelle; niemals Beträge in der Vorlage passend zum Bildteil überschreiben. Kategorie, betrieblicher Bezug, konkrete Prüfung und tatsächliche Zahlung bleiben zu prüfen. Es wird keine XRechnung-CIUS- oder PDF/A-/ZUGFeRD-Profilvalidierung behauptet. XML-Original, umgebendes PDF und Prüfergebnis werden unverändert beziehungsweise getrennt verschlüsselt archiviert.
 
-Ungültige XML oder Lieferanten-Gutschriften nicht als normale positive Ausgabe buchen. Mit `buchhaltung archiv evidence --file ORIGINAL --metadata NACHWEIS_JSON_AUSSERHALB` kann das Original zunächst ohne Ausgabenbuchung gesichert werden. Die Nachweismetadaten enthalten genau `date`, `description` und `verification_basis`; steuerliche Zuordnung anschließend konkret klären. Ebenso Abrechnungen/Banknachweise sichern, ohne daraus eine zweite Gebührenausgabe abzuleiten. Archivieren allein zählt niemals als Zahlung oder Buchung.
+Ungültige XML nicht als normale Ausgabe buchen. Mit `buchhaltung archiv evidence --file ORIGINAL --metadata NACHWEIS_JSON_AUSSERHALB` kann das Original zunächst ohne Ausgabenbuchung gesichert werden. Die Nachweismetadaten enthalten genau `date`, `description` und `verification_basis`; steuerliche Zuordnung anschließend konkret klären. Ebenso separat eingereichte Banknachweise sichern, ohne daraus eine zweite Gebührenausgabe abzuleiten. Kein automatischer eBay-Abrechnungs-/Gebührenimport. Archivieren allein zählt niemals als Zahlung oder Buchung.
+
+Bei Lieferanten-Storno/Minderung `document_type: supplier_credit`, `original_id` der bereits erfassten Ausgabe und `correction_reason` ergänzen. Den eindeutigen ursprünglichen Beleg mit Lieferant, Nummer, Datum, Beträgen und schon vorhandenen Minderungen lesen; unklaren Originalbezug beim Nutzer klären. Brutto, Netto und Steuer im Formular als positive Nennbeträge eingeben. Der Helfer speichert die gebuchte Minderung mit negativen Beträgen und erhält Original und Lieferantennummer; keine eigene Rechnungsnummer verwenden. XML-Belegart und vorhandener XML-Originalbezug müssen zur ausgewählten Ausgabe passen. Steuergruppen des Originals beibehalten. Der Minderungsbeleg selbst behauptet keine Erstattung: `pay_date`, `paid_amount` und `payment_evidence` nur bei konkret nachgewiesenem Erstattungszufluss angeben. Sonst bleibt er ohne Geldfluss; eine spätere Erstattung wird nach konkreter Freigabe separat als positiver Zahlungsbetrag im Ausgabenbereich zugeordnet.
 
 Ein verschlüsseltes Archivoriginal wird im Speicher entschlüsselt. Ist es bereits gebucht, melde den bestehenden Datensatz und stoppe. Eine bereits korrekt abgelegte, ungebookte verschlüsselte Datei wird wiederverwendet. Ungetrackte Klartextbelege innerhalb des Repos verschiebt `inspect` in den externen Prüfordner, damit sie nicht versehentlich eingecheckt werden; melde diesen konkreten neuen Pfad. Getrackte Klartextoriginale erfordern eine separate Klärung ihrer Git-Historie. Externe Originaldateien bleiben an ihrem Ort.
 
@@ -42,6 +44,8 @@ Steuerangaben dokumentieren, nicht anhand des Kleinunternehmerstatus auf 0 % set
 ## Konkrete Prüfung und Freigabe
 
 Zeige eine kompakte Tabelle mit **Empfänger, Belegnummer, Datum/Zeitraum, Brutto, Netto, Steuer, Kategorie und Zahlung**. Nenne fehlenden Zahlungsnachweis, Sondersteuerprüfung oder gemischte/private Nutzung kurz darunter. Zeige keine vollständige Rechnungsempfängeranschrift. Bitte um Bestätigung der konkreten Angaben **und der Buchung**. Korrekturen des Nutzers zuerst in der Metadatenvorlage übernehmen und erneut `prepare` ausführen; die neue Revision freigeben lassen. Die Bitte, einen Beleg anzuschauen, ist noch keine Buchungsfreigabe.
+
+Bei Lieferanten-Minderungen zusätzlich Belegart, ursprüngliche Belegnummer, Originalbetrag, verbleibenden minderbaren Betrag, Grund und tatsächlichen Erstattungsstatus nennen. Die Freigabe muss den konkreten verknüpften Minderungsbeleg und gegebenenfalls den nachgewiesenen Geldzufluss umfassen. Ohne diese Angaben keine gebuchte Minderung oder Zahlung anlegen.
 
 Nach Freigabe nur die angezeigte unveränderte Revision buchen:
 

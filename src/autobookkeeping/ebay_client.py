@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from xml.etree import ElementTree as ET
 from xml.sax.saxutils import escape as xml_escape
@@ -24,17 +24,49 @@ class EbayTradingClient:
         self.settings = settings
         self.trading_url = self.SANDBOX_TRADING_URL if settings.ebay_sandbox else self.PROD_TRADING_URL
 
-    def get_orders(self, days: int = 30, limit: int = 20, shipped_only: bool = False) -> list[EbayOrder]:
-        root = self._call("GetOrders", self._get_orders_xml(days=days, limit=limit))
-        orders = [_parse_order(node) for node in _findall(root, ".//e:Order")]
+    def get_orders(self, days: int = 30, limit: int | None = 20, shipped_only: bool = False) -> list[EbayOrder]:
+        if not 1 <= days <= 90 or limit is not None and limit < 1:
+            raise ValueError('Abruf benötigt 1–90 Tage und ein positives Limit')
+        orders = []; self.order_pages = []; self.orders_complete = False
+        current = datetime.now(timezone.utc)
+        self.order_window = {'from': (current-timedelta(days=days)+timedelta(minutes=2)).isoformat(),
+                             'to': (current-timedelta(minutes=2)).isoformat()}
+        entries = min(limit or 100, 100)
+        for page in range(1, 1001):
+            root = self._call('GetOrders', self._get_orders_xml(days=days, limit=entries, page=page,
+                               window=self.order_window if limit is None or days>30 else None))
+            returned_page = _text(root, 'e:PaginationResult/e:PageNumber')
+            if returned_page and int(returned_page) != page:
+                raise RuntimeError('eBay lieferte eine andere Ergebnisseite')
+            payload = getattr(self, 'last_response_bytes', None) or ET.tostring(root, encoding='utf-8')
+            if payload in self.order_pages:
+                raise RuntimeError('eBay wiederholt Ergebnisseiten; Abruf unvollständig')
+            self.order_pages.append(payload)
+            rows = [_parse_order(node) for node in _findall(root, './/e:Order')]
+            orders.extend(rows)
+            more = _text(root, 'e:HasMoreOrders')
+            total_pages = _text(root, 'e:PaginationResult/e:TotalNumberOfPages')
+            if more is None and total_pages is None and limit is None:
+                raise RuntimeError('eBay liefert keine Vollständigkeitsangabe')
+            has_more = more == 'true' if more is not None else page < int(total_pages or page)
+            if total_pages is not None and has_more != (page < int(total_pages)):
+                raise RuntimeError('eBay meldet widersprüchliche Seitenzahlen')
+            if not has_more:
+                self.orders_complete = True; break
+            if not rows:
+                raise RuntimeError('eBay meldet weitere, aber leere Ergebnisseiten')
+            if limit is not None and len(_coalesce_orders(orders)) >= limit:
+                break
+        else:
+            raise RuntimeError('Sicherheitslimit der eBay-Seiten erreicht; kein vollständiger Abruf')
         orders = _coalesce_orders(orders)
         if shipped_only:
             orders = [order for order in orders if order.is_shipped]
         return sorted(
             orders,
-            key=lambda order: order.created_at or datetime.min,
+            key=lambda order: _timestamp(order.created_at),
             reverse=True,
-        )
+        )[:limit]
 
     def get_order(self, order_id: str) -> EbayOrder:
         root = self._call("GetOrders", self._get_order_xml(order_id))
@@ -66,6 +98,7 @@ class EbayTradingClient:
 
         response = httpx.post(self.trading_url, content=body.encode("utf-8"), headers=headers, timeout=30)
         response.raise_for_status()
+        self.last_response_bytes = response.content
         root = ET.fromstring(response.content)
         ack = _text(root, "e:Ack")
         if ack not in {"Success", "Warning"}:
@@ -76,16 +109,20 @@ class EbayTradingClient:
         token = xml_escape(self.settings.ebay_authnauth_token)
         return f"<RequesterCredentials><eBayAuthToken>{token}</eBayAuthToken></RequesterCredentials>"
 
-    def _get_orders_xml(self, days: int, limit: int) -> str:
+    def _get_orders_xml(self, days: int, limit: int, page: int = 1, window=None) -> str:
+        # NumberOfDays is limited to 30; explicit creation windows allow 90.
+        dates = (f'<CreateTimeFrom>{window["from"]}</CreateTimeFrom><CreateTimeTo>{window["to"]}</CreateTimeTo>'
+                 if window else f'<NumberOfDays>{days}</NumberOfDays>')
         return f"""<?xml version="1.0" encoding="utf-8"?>
 <GetOrdersRequest xmlns="urn:ebay:apis:eBLBaseComponents">
   <DetailLevel>ReturnAll</DetailLevel>
-  <NumberOfDays>{days}</NumberOfDays>
+  {dates}
   <OrderRole>Seller</OrderRole>
   <OrderStatus>All</OrderStatus>
+  <SortingOrder>Descending</SortingOrder>
   <Pagination>
     <EntriesPerPage>{limit}</EntriesPerPage>
-    <PageNumber>1</PageNumber>
+    <PageNumber>{page}</PageNumber>
   </Pagination>
 </GetOrdersRequest>"""
 

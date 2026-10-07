@@ -74,6 +74,14 @@ def document_flows(catalog: dict, row: dict) -> tuple[list[dict], list[str]]:
                 warnings.append("Ausgabe erst teilweise bezahlt")
         else:
             warnings.append("Zahlungsdatum der Ausgabe fehlt")
+    elif kind=="expense_credit":
+        if row.get('pay_date'):
+            append(decimal_money(row.get('paid_amount') or -Decimal(row['gross'])), row['pay_date'],
+                   'supplier-refund','source_pay_date','expense')
+            if Decimal(row.get('paid_amount') or -Decimal(row['gross'])) < abs(Decimal(row['gross'])):
+                warnings.append('Lieferanten-Korrektur erst teilweise erstattet')
+        else:
+            warnings.append('Lieferanten-Korrektur ohne nachgewiesene Erstattung; kein Geldfluss')
     elif kind=="credit_note":
         warnings.append("Keine tatsächliche Zahlung/Erstattung zugeordnet; Minderungsbeleg allein bewegt kein Geld")
     return flows,warnings
@@ -95,12 +103,12 @@ def record_cash(workflow, payload: dict, approved: bool) -> dict:
         raise WorkflowError("Zahlungsbewegung darf nicht null sein")
     workflow.archive.verify();before=workflow.archive.catalog();after=copy.deepcopy(before)
     row=after["records"][payload["record_id"]]["current"]
-    if row["kind"] not in ("invoice","expense","credit_note") or row.get("status") in ("draft","test_draft") or row.get("currency","EUR")!="EUR":
+    if row["kind"] not in ("invoice","expense","expense_credit","credit_note") or row.get("status") in ("draft","test_draft") or row.get("currency","EUR")!="EUR":
         raise WorkflowError("Zahlungszuordnung benötigt einen echten EUR-Beleg")
     if row.get("source")=="local" and row["kind"]=="invoice" and amount<0:
         raise WorkflowError("Lokale Rückzahlungen am verknüpften Minderungsbeleg erfassen; Zahlungsfehler mit cash-void berichtigen")
     eid="cash:"+sha(payload["external_reference"].encode())
-    event=dict(payload,amount=str(amount),bucket="expense" if row["kind"]=="expense" else "income")
+    event=dict(payload,amount=str(amount),bucket="expense" if row["kind"] in ("expense","expense_credit") else "income")
     existing=after.get("cash_events",{}).get(eid)
     if existing:
         if {k:existing[k] for k in event}!=event or eid in after.get("cash_event_voids",{}):
@@ -115,6 +123,10 @@ def record_cash(workflow, payload: dict, approved: bool) -> dict:
         raise WorkflowError("Rückzahlungssumme übersteigt den Minderungsbeleg")
     if row["kind"]=="expense" and not -limit<=total<=0:
         raise WorkflowError("Zahlungssumme liegt außerhalb des Ausgabenbelegs")
+    if row['kind']=='expense_credit' and not 0<=total<=limit:
+        raise WorkflowError('Lieferanten-Erstattung muss positiv sein und innerhalb der Korrektur liegen')
+    if row['kind']=='expense_credit' and amount<0:
+        raise WorkflowError('Lieferanten-Erstattung muss positiv sein; fehlerhafte Zuordnung berichtigen')
     event["recorded_at"]=now()
     after.setdefault("cash_events",{})[eid]=event
     after.setdefault("cash_source_overrides",{})[row["id"]]={"complete":payload["source_complete"],"updated_at":now()}

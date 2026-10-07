@@ -91,7 +91,7 @@ class Publication:
 
     def own_commit(self, message, parent):
         names = self.names("diff-tree", "--no-commit-id", "--name-only", "-r", "-z", "HEAD")
-        allowed = (lambda n: n.startswith("buchhaltung/nachweise/")) if "proof update:" in message or "timestamp:" in message else (lambda n: data_path(n) or n in ("dashboard.html", "tool-version.json"))
+        allowed = (lambda n: n.startswith("buchhaltung/nachweise/") or n in ('timestamp-status.json','dashboard.html')) if "proof update:" in message or "timestamp:" in message else (lambda n: data_path(n) or n in ("dashboard.html", "tool-version.json"))
         return (git(self.repo, "log", "-1", "--format=%s").decode().strip() == message
                 and git(self.repo, "rev-parse", "HEAD^").decode().strip() == parent
                 and all(allowed(n) for n in names))
@@ -108,6 +108,8 @@ class Publication:
     def proof_changes(self):
         names = self.names("diff", "--name-only", "HEAD", "-z", "--", "buchhaltung/nachweise")
         names += self.names("ls-files", "--others", "--exclude-standard", "-z", "--", "buchhaltung/nachweise")
+        names += self.names('diff','--name-only','HEAD','-z','--','timestamp-status.json')
+        names += self.names('ls-files','--others','--exclude-standard','-z','--','timestamp-status.json')
         return sorted(set(names))
 
     def ensure_proof(self, statement):
@@ -137,10 +139,10 @@ class Publication:
         elif not names:
             self.path.unlink(); return {"status": "unchanged", "new_commit": False}
         else:
-            if any(not re.fullmatch(r"buchhaltung/nachweise/[a-f0-9]{40}(?:[a-f0-9]{24})?\.json(?:\.ots(?:\.bak)?)?", n) for n in names):
+            if any(n != 'timestamp-status.json' and not re.fullmatch(r"buchhaltung/nachweise/[a-f0-9]{40}(?:[a-f0-9]{24})?\.json(?:\.ots(?:\.bak)?)?", n) for n in names):
                 raise WorkflowError("Unerwartete Datei im Zeitnachweis; nicht automatisch committen")
             for name in names:
-                if name.endswith(".json"):
+                if name.endswith(".json") and name != 'timestamp-status.json':
                     statement = self.repo / name
                     verify_checkpoint(self.repo, statement)
                     # A failed manual stamp may have written only the statement.
@@ -152,7 +154,9 @@ class Publication:
                 if name.endswith(".ots"):
                     if not list(load_proof(self.repo / name[:-4], self.repo / name).timestamp.all_attestations()):
                         raise WorkflowError("Zeitnachweis enthält keine Kalender-/Bitcoin-Attestierung")
-            state["proof_commit"] = self.commit_paths(names, message)
+            subprocess.run([sys.executable,'-X','utf8',str(tool_root()/'scripts/build_bookkeeping_dashboard.py')],
+                           cwd=self.repo,capture_output=True,check=True,timeout=60)
+            state["proof_commit"] = self.commit_paths([*names,'dashboard.html'], message)
         state["phase"] = "proof_push"; self.write()
         git(self.repo, "push")
         self.path.unlink(); return {"status": "proofs_published", "proof_commit": state["proof_commit"], "pushed": True}
@@ -222,6 +226,9 @@ class Publication:
                 statement = checkpoint(self.repo, data_commit)
                 proof = self.ensure_proof(statement)
             names = [statement.relative_to(self.repo).as_posix(), proof.relative_to(self.repo).as_posix()]
+            subprocess.run([sys.executable,'-X','utf8',str(tool_root()/'scripts/build_bookkeeping_dashboard.py')],
+                           cwd=self.repo,capture_output=True,check=True,timeout=60)
+            names.append('dashboard.html')
             state["proof_commit"] = self.commit_paths(names, "Bookkeeping timestamp: " + state["token"])
             state["phase"] = "proof_push"; self.write()
         git(self.repo, "push")

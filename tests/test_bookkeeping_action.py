@@ -29,3 +29,10 @@ def test_finish_carries_the_exact_current_revision(section, script, sub):
     assert command[:3] == [script, sub, row['id']]
     assert command[command.index('--revision') + 1] == row['revision'] and command[-1] == '--approved'
     with pytest.raises(WorkflowError): MODULE['command'](args, 'records', row)
+
+
+def test_supplier_credit_import_resolves_original_locally_without_booking():
+    args=SimpleNamespace(action='supplier-credit-inspect',file=Path('SYNTHETIC-CREDIT.pdf'))
+    row={'id':'PRIVATE IDENTIFIER','kind':'expense'}
+    assert MODULE['command'](args,'records',row)==['receipt.py','inspect','SYNTHETIC-CREDIT.pdf','--original-id',row['id']]
+    with pytest.raises(WorkflowError):MODULE['command'](args,'local_expense_drafts',row)
