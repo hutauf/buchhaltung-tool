@@ -76,10 +76,9 @@ def restore_test(workflow,bid,directory,raise_failure=False):
             run('-C',data,'checkout','--quiet','--detach',row['data_commit'])
             run('-C',tool,'checkout','--quiet','--detach',row['tool_commit'])
             run('-C',data,'fsck','--full');run('-C',tool,'fsck','--full')
-            atomic(data/'.env',('ENCRYPTION_PASSWORD='+json.dumps(workflow.archive.password)+'\n').encode())
             restored=Archive(data,workflow.archive.password); check=restored.verify()
             proofs=list((restored.root/'nachweise').glob('*.json'))
-            for statement in proofs: verify_checkpoint(data,statement)
+            for statement in proofs: verify_checkpoint(data,statement,workflow.archive.password)
             event(workflow,bid,{'type':'restore_test','result':'passed', 'records':check['records'],
                                'directory':str(source),
                                'documents':check['documents'],'git_proofs':len(proofs),

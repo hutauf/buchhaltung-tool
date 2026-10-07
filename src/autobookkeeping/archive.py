@@ -392,7 +392,7 @@ def git(repo: Path, *args: str) -> bytes:
 
 
 @contextmanager
-def historical_repo(repo, commit):
+def historical_repo(repo, commit, password=None):
     try:
         git(repo, "cat-file", "-e", commit + "^{commit}")
     except subprocess.CalledProcessError:
@@ -405,7 +405,7 @@ def historical_repo(repo, commit):
     from autobookkeeping.workspace import git_environment
     with tempfile.TemporaryDirectory(prefix="bookkeeping-history-") as temp:
         bundle = Path(temp) / "legacy.bundle"
-        atomic(bundle, unseal(Archive(repo).unlock(), path.read_bytes(), "migration/legacy-repository.bundle"))
+        atomic(bundle, unseal(Archive(repo,password).unlock(), path.read_bytes(), "migration/legacy-repository.bundle"))
         bare = Path(temp) / "history.git"
         subprocess.run(["git", "clone", "--bare", str(bundle), str(bare)], env=git_environment(), capture_output=True, check=True)
         git(bare, "cat-file", "-e", commit + "^{commit}")
@@ -462,12 +462,12 @@ def checkpoint(repo: Path, revision: str = "HEAD") -> Path:
     return path
 
 
-def verify_checkpoint(repo: Path, path: Path) -> dict:
+def verify_checkpoint(repo: Path, path: Path, password=None) -> dict:
     data = json.loads(path.read_bytes())
     commit = data["git_commit"]
     if not re.fullmatch(r"[a-f0-9]{40}|[a-f0-9]{64}", commit):
         raise ValueError("Ungültiger Git-Hash")
-    with historical_repo(repo, commit) as history:
+    with historical_repo(repo, commit, password) as history:
         obj = git(history, "cat-file", "commit", commit)
         if sha(b"commit " + str(len(obj)).encode() + b"\0" + obj) != data["git_commit_object_sha256"]:
             raise ValueError("Commitobjekt verändert")

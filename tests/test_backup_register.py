@@ -38,12 +38,22 @@ def test_failed_restore_is_recorded_without_false_success(tmp_path):
     assert archive.verify()['ok']
 
 
-def test_restore_clones_both_bundles_and_checks_exact_snapshot(tmp_path):
+@pytest.mark.parametrize('legacy',[False,True])
+def test_restore_clones_both_bundles_and_checks_exact_snapshot(tmp_path,legacy):
     import subprocess
-    from autobookkeeping.archive import seal
-    repo=tmp_path/'repo';repo.mkdir();archive=Archive(repo,'synthetic-password');archive.init()
+    from autobookkeeping.archive import seal, checkpoint
+    password='synthetic-\u00e4${SYNTHETIC_UNSET_VAR}' if legacy else 'synthetic-password'
+    repo=tmp_path/'repo';repo.mkdir();archive=Archive(repo,password);archive.init()
     tool=tmp_path/'tool';tool.mkdir();(tool/'README.md').write_text('Synthetic tool')
     def git(directory,*args):return subprocess.check_output(['git','-C',str(directory),*args],stderr=subprocess.PIPE)
+    if legacy:
+        old=tmp_path/'legacy';old.mkdir();Archive(old,password).init()
+        git(old,'init');git(old,'config','core.autocrlf','false');git(old,'config','user.name','Synthetic Test');git(old,'config','user.email','test@example.invalid')
+        git(old,'add','.');git(old,'commit','-m','Synthetic legacy snapshot')
+        statement=checkpoint(old)
+        atomic(archive.root/'nachweise'/statement.name,statement.read_bytes())
+        old_bundle=tmp_path/'legacy.bundle';git(old,'bundle','create',str(old_bundle),'--all')
+        atomic(repo/'migration/legacy-repository.bundle.enc',seal(archive.unlock(),old_bundle.read_bytes(),'migration/legacy-repository.bundle'))
     for directory in (repo,tool):
         git(directory,'init');git(directory,'config','core.autocrlf','false');git(directory,'config','user.name','Synthetic Test');git(directory,'config','user.email','test@example.invalid')
         git(directory,'add','.');git(directory,'commit','-m','Synthetic snapshot')
@@ -58,4 +68,5 @@ def test_restore_clones_both_bundles_and_checks_exact_snapshot(tmp_path):
     result=restore_test(workflow,bid,folder,raise_failure=True)
     assert result['ok'],result
     assert result['restored'] and result['records']==0
+    assert archive.catalog()['backup_register'][bid]['events'][-1]['git_proofs']==int(legacy)
     assert public_status(archive.catalog())['rows'][0]['restore_result']=='passed'
