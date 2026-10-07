@@ -49,7 +49,10 @@ def test_import_idempotence_immutable_original_and_tampering(tmp_path):
     with pytest.raises(ValueError): archive.import_local(meta, [pdf])
     assert archive.catalog()["records"]["imported:invoice:1"]["current"] == row
     path = archive.root / row["documents"][0]
-    path.write_bytes(path.read_bytes()[:-1] + b"!")
+    ciphertext = path.read_bytes()
+    tampered = ciphertext[:-1] + bytes([ciphertext[-1] ^ 1])
+    assert tampered != ciphertext
+    path.write_bytes(tampered)
     with pytest.raises(ValueError): archive.verify()
 
 
