@@ -17,6 +17,8 @@ def test_supported_canonical_remotes(url):
 
 @pytest.mark.parametrize('url', ['https://github.com.evil.invalid/user/repo',
                                 'https://secret:password@github.com/user/repo',
+                                'https://synthetic-secret@github.com/user/repo',
+                                'ssh://synthetic-secret@github.com/user/repo',
                                 'https://github.com/user/repo?token=secret',
                                 'git@unverified.invalid:user/repo',
                                 'https://github.com/user/../repo'])
@@ -36,6 +38,8 @@ def test_only_explicit_existing_local_bare_repository_is_accepted(tmp_path):
     (200, {'full_name':'synthetic/private','private':True,'visibility':'internal'}, False),
     (200, {'full_name':'other/repository','private':True,'visibility':'private'}, False),
     (200, {'full_name':'synthetic/private'}, False),
+    (200, None, False), (200, [], False),
+    (200, {'full_name':None,'private':True,'visibility':'private'}, False),
     (404, {}, False), (403, {}, False), (302, {}, False),
 ])
 def test_visibility_requires_exact_authenticated_metadata(monkeypatch,tmp_path,status,metadata,allowed):

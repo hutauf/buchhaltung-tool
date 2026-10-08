@@ -20,7 +20,9 @@ def github_repository(url: str) -> str | None:
         parsed = urlsplit(url)
         if parsed.hostname != 'github.com' or parsed.scheme not in ('https', 'ssh') or parsed.port:
             raise WorkflowError('Privatheitsprüfung unterstützt nur kanonische GitHub-Remotes')
-        if parsed.password or parsed.query or parsed.fragment:
+        if (parsed.password or parsed.query or parsed.fragment
+                or parsed.scheme == 'https' and parsed.username
+                or parsed.scheme == 'ssh' and parsed.username not in (None, 'git')):
             raise WorkflowError('Remote darf keine Zugangswerte oder URL-Zusätze enthalten')
         path = parsed.path.lstrip('/')
     else:
@@ -69,7 +71,8 @@ def assert_private_remote(url: str, repo: Path) -> dict:
         metadata = response.json()
     except (httpx.HTTPError, ValueError):
         raise WorkflowError('GitHub-Privatheit wegen API-/Verbindungsfehler nicht bestätigt') from None
-    if (metadata.get('full_name', '').lower() != name.lower()
+    if (not isinstance(metadata, dict) or not isinstance(metadata.get('full_name'), str)
+            or metadata.get('full_name', '').lower() != name.lower()
             or metadata.get('private') is not True or metadata.get('visibility') != 'private'):
         raise WorkflowError('Datenrepo ist nicht als privates GitHub-Repo bestätigt; Veröffentlichung gesperrt')
     return {'private': True, 'verification': 'github_api'}
