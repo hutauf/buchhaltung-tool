@@ -24,8 +24,6 @@ def install_hooks():
     except subprocess.CalledProcessError: data_hooks = ''
     if data_hooks:
         raise ValueError('Individuellen Daten-hooksPath zuerst bewusst integrieren; nichts ersetzt')
-    git(TOOL, 'config', '--local', 'core.hooksPath', '.githooks')
-    git(TOOL, 'config', '--local', 'bookkeeping.allowToolCommit', 'false')
     directory = Path(git(data, 'rev-parse', '--git-path', 'hooks').decode().strip())
     if not directory.is_absolute(): directory = data / directory
     python = TOOL / '.venv/Scripts/python.exe' if sys.platform == 'win32' else TOOL / '.venv/bin/python'
@@ -35,6 +33,8 @@ def install_hooks():
         destination = directory / name
         if destination.exists() and b'bookkeeping-workspace generated hook' not in destination.read_bytes():
             raise ValueError('Vorhandener eigener Daten-Hook bleibt unverändert; bewusst integrieren')
+    git(TOOL, 'config', '--local', 'core.hooksPath', '.githooks')
+    git(TOOL, 'config', '--local', 'bookkeeping.allowToolCommit', 'false')
     for name, (script, arguments) in hooks.items():
         hook = ("#!/bin/sh\n# bookkeeping-workspace generated hook\nexec '" + python.as_posix() + "' -X utf8 '" +
                 (TOOL / 'scripts' / script).as_posix() + "'" + arguments + (' "$@"' if name == 'pre-push' else '') + "\n").encode()

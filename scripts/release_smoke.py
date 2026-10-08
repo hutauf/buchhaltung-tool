@@ -39,7 +39,6 @@ def run_test(output: Path):
     run(['git','-C',clone,'config','user.name','Synthetic Release Test'])
     run(['git','-C',clone,'config','user.email','synthetic@example.invalid'])
     run(['git','-C',clone,'config','core.autocrlf','false'])
-    run(['git','-C',clone,'config','core.hooksPath','.git/unused-hooks'])
     venv.EnvBuilder(with_pip=True).create(clone/'.venv')
     python = clone/'.venv'/('Scripts/python.exe' if os.name=='nt' else 'bin/python')
     run([python,'-m','pip','install','-e',str(clone)+'[test]'])
