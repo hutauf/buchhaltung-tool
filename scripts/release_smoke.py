@@ -35,7 +35,7 @@ def run_test(output: Path):
         if result.returncode:
             raise RuntimeError('Release-Test fehlgeschlagen; lokales test.log prüfen')
         return result.stdout
-    run(['git','clone','--quiet','--no-hardlinks',TOOL,clone])
+    run(['git','clone','--quiet','--no-hardlinks','-c','core.autocrlf=false',TOOL,clone])
     run(['git','-C',clone,'config','user.name','Synthetic Release Test'])
     run(['git','-C',clone,'config','user.email','synthetic@example.invalid'])
     run(['git','-C',clone,'config','core.autocrlf','false'])
