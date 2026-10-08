@@ -46,7 +46,8 @@ def scenario(output):
             'introduction':'Synthetic acceptance test'}
     publish('configure',lambda:workflow.configure(seller,'0000',{'synthetic':True}))
     order=EbayOrder(order_id='SYNTHETIC-RELEASE-ORDER',sales_record_number='999999',
-        paid_at=datetime(2011,10,3,12,tzinfo=timezone.utc),total_value=13,shipping_cost=3,
+        paid_at=datetime(2011,10,3,12,tzinfo=timezone.utc),
+        shipped_at=datetime(2011,10,4,12,tzinfo=timezone.utc),total_value=13,shipping_cost=3,
         shipping_address=Address(name='SYNTHETIC BUYER',street1='Synthetic Street 2',postal_code='12345',
                                  city='Synthetic City',country_iso='DE'),
         items=[EbayOrderItem('SYNTHETIC ITEM',price=10,item_id='synthetic-item',transaction_id='synthetic-transaction')])
@@ -56,7 +57,7 @@ def scenario(output):
     publish('activate',lambda:workflow.activate('0000','0000',True,{'synthetic':True}))
     issued=publish('issue',lambda:workflow.issue(draft['id'],draft['revision'],'0001',order,True))
     assert issued['number']=='0001'
-    before_original={n:sha(archive.read(n)) for n in archive.catalog()['records'][draft['id']]['current']['documents']}
+    before_original={n:sha(archive.read(n)) for n in archive.catalog()['records'][issued['id']]['current']['documents']}
     receipt=output/'synthetic-expense.pdf'; buffer=io.BytesIO(); pdf=canvas.Canvas(buffer)
     pdf.drawString(30,800,'SYNTHETIC SUPPLIER | ONLY-TEST-1 | 11.00 EUR');pdf.save();receipt.write_bytes(buffer.getvalue())
     receipts=Receipts(workflow); review=receipts.inspect(receipt,output/'receipt-review')
