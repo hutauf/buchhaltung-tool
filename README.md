@@ -1,184 +1,68 @@
 # Lokale Buchhaltung
 
-Version **0.1.0-beta.1** (`buchhaltung --version`: `0.1.0b1`). Installation erfolgt
-aus dem Git-Checkout; kein eigenständiges Wheel/PyPI-Installationsangebot.
-Release-Umfang und Grenzen stehen in [CHANGELOG.md](CHANGELOG.md).
+eBay-Verkäufe und zugehörige Belege lokal verwalten: Rechnungen vorbereiten, Originale verschlüsselt archivieren und den Bestand im Dashboard überblicken. Aktuell eine **Betaversion für einzelne EÜR-Einträge**.
 
-Ein Werkzeug für eine eigene verschlüsselte Buchhaltungsablage, lokale Rechnungsentwürfe, Belegimport, EÜR-Arbeitsübersicht und Git-/OpenTimestamps-Nachweise. Kleinunternehmerfälle sowie ausdrücklich geprüfte inländische 7-/19-%-Positionen werden unterstützt. Sondersteuerfälle und eine abgabefertige Steuererklärung sind nicht vollständig abgebildet.
+## Zum Laufen bringen
 
-Der aktuelle Umfang sind **einzelne EÜR-Einträge**, vor allem Verkäufe und zugehörige Ausgaben wie Porto und Marktplatzgebühren. Vine-Entnahmen und eine vollständige EÜR folgen erst in späteren Schritten. Die [Verfahrensdokumentation](docs/verfahrensdokumentation.md) beschreibt technische Kontrollen, organisatorische Pflichten und offene Punkte. Vor dem betrieblichen Einsatz die [betriebliche Ergänzung](docs/betriebliche-ergaenzung-vorlage.md) privat ausfüllen; diese Vorlage ist kein Konformitätsnachweis.
+Du brauchst Python 3.11+, Git, einen GitHub-Zugang und ein **leeres privates Datenrepo**. Der GitHub-Zugang muss dessen Privatheit prüfen und dorthin pushen können; [Zugang einrichten](docs/einrichtung.md#github-zugang). Unter Windows einen kurzen Installationspfad verwenden.
 
-## Originale, E-Rechnungen und Aufbewahrung
-
-`buchhaltung beleg inspect PFAD` liest auch eigenständige UBL-/CII-Rechnungs-XML und Rechnungs-XML aus PDF-Anhängen. Gültige strukturierte Daten werden nach lokaler XSD-/EN16931-Prüfung in der Metadatenvorlage vorbefüllt; Zahlung, Kategorie und betrieblicher Bezug bleiben zu bestätigen. Ein PDF ohne Rechnungs-XML bleibt ein PDF-Original. Eine nachträglich erzeugte XML ersetzt niemals das empfangene Original.
-
-Ein freigegebener lokaler Rechnungsabschluss erzeugt PDF **und eigenständige EN16931-UBL-2.1-XML** aus denselben Daten sowie einen Validierungsnachweis. Finanzielle Stornos/Teilerstattungen erhalten ebenfalls XML mit Originalbezug. Formale Berichtigungen bleiben derzeit verknüpfte PDF-Dokumente. `buchhaltung rechnung preview ID --output NEUER_ORDNER_AUSSERHALB --e-invoice` exportiert die XML zur Prüfung; Test-XML trägt eine Testnummer und reserviert keine endgültige Rechnungsnummer. Das ist keine XRechnung-CIUS-Implementierung und kein als ZUGFeRD zertifiziertes PDF/A-3. Kein Versand erfolgt automatisch.
-
-Alle Originale, XML, Metadatenhistorien, Entwürfe, Zahlungen, Prüfergebnisse und archivierten Zusatznachweise bleiben erhalten. Die interne Mindestaufbewahrung beträgt **elf volle Kalenderjahre** ab Jahresende des letzten relevanten Vorgangs zum Dokument. `buchhaltung archiv retention` zeigt die frühestmögliche Prüfung; es gibt keinen automatischen Löschlauf. Laufende Verfahren oder andere Aufbewahrungsgründe können die Frist verlängern. Auch Git-Historie und Sicherungen müssen bei einem späteren Löschkonzept berücksichtigt werden.
-
-`buchhaltung archiv export --output NEUER_ORDNER_AUSSERHALB` exportiert stets den vollständigen aktuellen Archivbestand einschließlich aller im Katalog enthaltenen Historien. `--year` ist nur eine Ansichtsangabe und lässt keine Archivdaten weg. `catalog.json` enthält die vollständigen Metadaten, `export-manifest.json` die Original-Zuordnung; `database.json`/`index.html` bieten die Belegansicht. CD-Exporte enthalten zusätzlich beide vollständigen Git-Historien samt verschlüsselter Migrationshistorie. Passwort und `.env` gehören in keine Sicherung oder Klartextansicht.
-
-Abrechnungen, Banknachweise oder zunächst ungeklärte Belege ohne Ausgabenbuchung ablegen:
+**1. Tool installieren** — PowerShell öffnen, `DEIN-KONTO/DEIN-DATENREPO` ersetzen:
 
 ```powershell
-.venv\Scripts\buchhaltung.exe archiv evidence --file 'ORIGINAL_AUSSERHALB' --metadata 'NACHWEIS_JSON_AUSSERHALB'
-```
-
-Die Nachweismetadaten enthalten genau `date` (ISO-Datum), `description` und `verification_basis`. Dieser Archivvorgang führt die Commit-/Push-/OTS-Pipeline aus, erzeugt aber keinen EÜR-Eintrag und keinen Zahlungsfluss. Monatliche CD-Sicherung und Rückleseprüfung bleiben getrennte Arbeitsschritte.
-
-## Verkaufsabgleich, Lieferanten-Erstattungen und Sicherungsregister
-
-`buchhaltung abgleich ebay --days 90 --save` liest alle API-Seiten des gewählten Fensters, prüft SRN/Order-Aliasse und vergleicht Rechnungsbetrag und Originalbestand. Ergebnisse und empfangene API-Antworten werden verschlüsselt samt Zeitfenster gespeichert und durch die private Commit-/Push-/OTS-Pipeline veröffentlicht. Ohne `--save` ist der Aufruf nur lesend. `buchhaltung abgleich status` zeigt den letzten gespeicherten Abruf. Für einen täglichen Lauf den Speicherbefehl in den bestehenden Scheduler aufnehmen; das Tool selbst läuft nicht ständig im Hintergrund. Kein automatischer eBay-Abrechnungs-, Gebühren- oder Auszahlungsimport, keine automatische Rechnungserstellung und keine Bankabstimmung. Fehlende oder lediglich extern referenzierte Belege bleiben sichtbar.
-
-Lieferanten-Stornos und Minderungen über `buchhaltung beleg inspect PFAD` einlesen. In den geprüften Metadaten `document_type: "supplier_credit"`, `original_id` der vorhandenen Ausgabe und `correction_reason` ergänzen. Brutto/Netto/Steuer als positive Nennbeträge angeben. Der normale `prepare`-/`book --revision ... --approved`-Ablauf speichert den verknüpften Minderungsbeleg mit negativen Beträgen; die Originalausgabe und deren Nummer bleiben erhalten. Bei strukturiertem XML wird die Belegart erkannt. Eine tatsächliche Erstattung separat mit positivem Betrag und Nachweis über `zahlung erfassen` zuordnen oder beim bestätigten Eingang `pay_date`, `paid_amount` und `payment_evidence` angeben. Nur der tatsächliche Geldzufluss mindert die Zahlungs-Ausgaben. Keine eigene Rechnungsnummer wird verbraucht und keine Bankzahlung ausgeführt.
-
-```powershell
-.venv\Scripts\buchhaltung.exe sicherung export --output 'NEUER_ORDNER_AUSSERHALB'
-.venv\Scripts\buchhaltung.exe sicherung status
-.venv\Scripts\buchhaltung.exe sicherung bestaetigen --id 'BACKUP_ID_AUS_EXPORT' --directory 'PFAD_ZUM_MEDIUM' --medium 'MEDIENKENNUNG' --written --approved
-.venv\Scripts\buchhaltung.exe sicherung test --id 'BACKUP_ID_AUS_EXPORT' --directory 'PFAD_ZUM_MEDIUM'
-```
-
-Der Export registriert nur einen vorbereiteten Snapshot. Das Medium erst nach tatsächlichem Schreiben und Abschließen bestätigen; die Bestätigung liest sämtliche Paketdateien vom angegebenen Medium und vergleicht den registrierten Manifesthash. Der Exportordner selbst ist dafür kein zulässiges Rückleseziel. Es gibt keine automatische Brennererkennung. `sicherung test` stellt beide Git-Bundles isoliert außerhalb der Repos wieder her, prüft Git-Objekte, Archiv/Originale und historische Gitnachweise und erhält das Ergebnis im verschlüsselten Register. Neuinstallation der Abhängigkeiten und erneute Bitcoin-Verifikation sind gesonderte Tests. Ein fertiger, noch nicht registrierter Export lässt sich mit `sicherung registrieren ORDNER` eintragen.
-
-Das Offline-Dashboard zeigt den letzten API-Abgleich, monatlichen Sicherungsbedarf, Registerstände und Bitcoin-Nachweisstatus. Es zeigt passende Befehle; API-/Medienaktionen führt es nicht aus. `veroeffentlichen confirm` erhält erfolgreiche Bitcoin-Prüfungen in einem an genaue Datei-Hashes gebundenen privaten Cache und aktualisiert das Dashboard. Öffentliche Verfahrensbeschreibung und private Betriebsangaben werden bei jeder Funktionsänderung mitgepflegt. Offene betriebliche Zuständigkeiten bleiben offen.
-
-## Technische Protokolle und Prüfexport
-
-Katalogänderungen werden automatisch in einem verschlüsselten, verketteten Änderungsprotokoll gespeichert. Vorherige Werte, Änderungszeitpunkt und Toolrevision bleiben prüfbar. Vorhandene Originaldateien und ihre Inventar-Prüfsummen dürfen die Helfer nicht überschreiben oder entfernen. Die Veröffentlichung speichert außerdem die tatsächlich bestandene technische Archivprüfung. Das belegt keinen vollständigen Quellenabgleich.
-
-Der vollständige Prüfexport enthält zusätzlich `catalog-nodes.csv` (sämtliche Katalogwerte und Verknüpfungen), `records.csv` (Belege/Entwürfe einschließlich Versionen), `documents.csv`, `record-documents.csv` und `data-description.json` mit Feldtypen, Format und Prüfsummen. Alle Dateien entstehen außerhalb beider Repos; die normalen Arbeitsbefehle bleiben gleich. Bestehende Archive ohne dieses Protokoll bleiben lesbar und starten es erst bei der nächsten Katalogänderung mit einem ausdrücklich bezeichneten Ausgangsstand. Frühere Ereigniszeiten werden nicht erfunden.
-
-## Zwei unabhängige Repositories
-
-Dieses öffentliche Repository enthält ausschließlich Code, Vorlagen, Skills und synthetische Tests. `daten/` ist vollständig ignoriert: dort wird ein **eigenständiges privates Git-Repo** geklont. Es gibt keine Submodule-Verknüpfung. Belege, Schlüsselhülle, verschlüsselte Datenbank, verschlüsselte Checkliste, Nachweise und das persönliche Dashboard gehören ausschließlich ins Datenrepo. `.env` bleibt lokal.
-
-## Einrichtung
-
-Python 3.11+ und Git installieren. Ein leeres privates Datenrepo bei GitHub anlegen und das Tool klonen. Im Toolordner:
-
-Unter Windows ohne aktivierte Unterstützung langer Pfade einen kurzen Toolpfad
-verwenden, beispielsweise `C:\bk\tool`. Factur-X enthält sehr umfangreiche Schemanamen; eine
-Installation tief verschachtelt unter Downloads/Benutzerordner kann deshalb scheitern.
-Das Tool verändert keine systemweite Windows-Pfadeinstellung.
-
-```powershell
+git clone https://github.com/hutauf/buchhaltung-tool.git C:/bk/tool
+cd C:/bk/tool
 py -m venv .venv
-.venv\Scripts\python.exe -m pip install -e ".[test]"
-.venv\Scripts\python.exe -X utf8 scripts\setup_workspace.py --data-url 'git@github.com:DEIN_KONTO/DEIN_PRIVATES_DATENREPO.git'
+.venv/Scripts/python.exe -m pip install -e .
+.venv/Scripts/python.exe -X utf8 scripts/setup_workspace.py --data-url 'https://github.com/DEIN-KONTO/DEIN-DATENREPO.git'
 ```
 
-In `daten/.env` lokal `ENCRYPTION_PASSWORD` hinterlegen. Optional benötigte eBay-, GMX- und Vine-Zugangswerte ebenfalls dort konfigurieren; nichts davon committen. Git-Autor im privaten Repo konfigurieren. Vor dem ersten Archiv-CLI muss dort ein initialer Commit mit Rollenmarkierung und Konfiguration existieren und nach `origin/main` gepusht sein:
+**2. Passwort hinterlegen:** `daten/.env` anlegen und `ENCRYPTION_PASSWORD='DEIN-STARKES-PASSWORT'` eintragen. Passwort getrennt sichern. Belege gehören ins private Datenrepo; Zugangsdaten bleiben lokal.
 
-Bereits vor der Einrichtung bestätigt eine authentifizierte GitHub-API-Abfrage
-die tatsächliche Sichtbarkeit `private`. Verwendet werden `GH_TOKEN`/`GITHUB_TOKEN`
-aus Umgebung beziehungsweise `daten/.env` oder vorhandene Git-Credentials für
-`github.com`. Bei einem neuen Workspace Tokens gegebenenfalls zunächst in der
-Prozessumgebung bereitstellen. Lesender Repository-Metadatenzugriff genügt.
-Ein reiner SSH-Schlüssel gewährt diesen API-Zugriff nicht. Zugangswerte werden nicht
-ausgegeben; es gibt keinen automatischen Login und keine Erweiterung von Rechten.
-API-Ausfall, fehlende Berechtigung, public/internal und unbestätigte Umbenennung
-blockieren Einrichtung/Veröffentlichung. GitHub Enterprise und fremde Netzwerkremotes
-werden derzeit nicht unterstützt. Lokale vorhandene Bare-Repos dienen Offline-Tests;
-für sie wird keine GitHub-Privatheit behauptet.
+**3. Leeres Archiv starten** — Git-Name und E-Mail müssen eingerichtet sein ([Anleitung](docs/einrichtung.md#git-autor)):
 
 ```powershell
 git -C daten add .bookkeeping-data.json .gitignore .gitattributes workspace.json AGENTS.md verfahrensdokumentation.md buchhaltung
 git -C daten commit -m "Initialize private bookkeeping workspace"
 git -C daten push -u origin main
-.venv\Scripts\python.exe -X utf8 scripts\bookkeeping_archive.py init
+.venv/Scripts/buchhaltung.exe archiv init
 ```
 
-`init` erzeugt eine leere verschlüsselte Ablage samt vollständiger Veröffentlichung. Vorhandene Daten nicht neu initialisieren oder Schlüssel ersetzen. Auch dieses Toolrepo muss einen sauberen eingecheckten Stand besitzen; bei einem normalen Klon ist das bereits der Fall.
+Diese Schritte gelten für eine Neueinrichtung. Bei vorhandenem Bestand nach der [Einrichtungsanleitung](docs/einrichtung.md) vorgehen. Für eigene Rechnungen anschließend das [Absenderprofil einrichten](docs/einrichtung.md#rechnungsprofil).
 
-## Bedienung
+## eBay und GMX/DHL anbinden
 
-`buchhaltung` ist der gemeinsame lokale Einstieg. Nach Installation steht der Befehl in `.venv/Scripts/`; alternativ funktioniert `.venv\Scripts\python.exe -X utf8 -m autobookkeeping.cli`. Die vorhandenen Helferskripte bleiben für Automatisierung und Wiederaufnahme verfügbar.
+In `daten/.env` die eBay-Zugangsdaten und den GMX-Login ergänzen: [Schritt für Schritt](docs/einrichtung.md#ebay-und-gmxdhl). Damit lassen sich Verkäufe aus eBay abrufen und passende DHL-Belege aus den Bestätigungsmails suchen und herunterladen. Ein eigener DHL-API-Zugang ist dafür nicht nötig.
 
 ```powershell
-.venv\Scripts\buchhaltung.exe --help
-.venv\Scripts\buchhaltung.exe rechnung list
-.venv\Scripts\buchhaltung.exe beleg inspect 'PFAD_ZUM_BELEG'
-.venv\Scripts\buchhaltung.exe zahlung erfassen --metadata 'GEPRUEFTE_ZAHLUNG.json' --approved
-.venv\Scripts\buchhaltung.exe pruefen
-.venv\Scripts\buchhaltung.exe dashboard
-.venv\Scripts\buchhaltung.exe sicherung export --output 'NEUER_ORDNER_AUSSERHALB'
-.venv\Scripts\buchhaltung.exe veroeffentlichen status
+.venv/Scripts/buchhaltung.exe ebay --days 30 --limit 10 --paid-only
+.venv/Scripts/python.exe -X utf8 scripts/find_dhl_receipt.py 'SENDUNGSNUMMER_ODER_SUCHBEGRIFF' --download --output-dir C:/bk/belegpruefung/dhl
 ```
 
-Dieser Toolstand enthält keine Anbindung an einen externen Rechnungsdienst. Historische Quellkennungen bleiben unverändert in der privaten verschlüsselten Ablage; vorhandene Positionen und Zahlungen werden lokal ausgewertet. Exporte aus alten Diensten vorbereiten und prüfen, bevor sie als lokale Originalbelege importiert werden. Ein Import stellt keine neue Rechnung aus.
+Einrichtung und Abruf buchen noch keine Rechnung oder Ausgabe. Rechnungsentwürfe brauchen derzeit zusätzlich eine [Vine-Anbindung](docs/einrichtung.md#vine). Regelmäßige Abrufe müssen im Scheduler eingerichtet werden.
 
-Alle Befehle im **äußeren Toolordner** ausführen:
+## Im Alltag
 
 ```powershell
-.venv\Scripts\python.exe -X utf8 scripts\bookkeeping_archive.py verify
-.venv\Scripts\python.exe -X utf8 scripts\bookkeeping_archive.py report
-.venv\Scripts\python.exe -X utf8 scripts\build_bookkeeping_dashboard.py
-.venv\Scripts\python.exe -X utf8 scripts\homeoffice.py preview --year 2026
-.venv\Scripts\python.exe -X utf8 scripts\receipt.py inspect 'PFAD_ZUM_BELEG'
-.venv\Scripts\python.exe -X utf8 scripts\publish_bookkeeping.py status
-.venv\Scripts\python.exe -X utf8 scripts\publish_bookkeeping.py resume
-.venv\Scripts\python.exe -X utf8 scripts\publish_bookkeeping.py confirm
+.venv/Scripts/buchhaltung.exe --help
+.venv/Scripts/buchhaltung.exe beleg inspect 'PFAD_ZUM_BELEG'
+.venv/Scripts/buchhaltung.exe dashboard
 ```
 
-`daten/dashboard.html` per Doppelklick öffnen. Die statische Seite zeigt für Änderungen passende CLI-Befehle. Homeoffice hat 210 Tage als Eingabevorgabe, keinen automatisch gebuchten Jahresansatz. Belege und Metadaten vor einer konkreten Buchungsfreigabe prüfen. Lokale Rechnungen starten im Probebetrieb; der Produktivwechsel und die fortlaufende Nummernübernahme verlangen eine gesonderte Freigabe.
+`daten/dashboard.html` per Doppelklick öffnen. Die Seite zeigt den Bestand und die passenden kopierbaren Befehle für Änderungen. Rechnungsabschlüsse, Ausgaben und Zahlungen verlangen eine konkrete Freigabe. Vor dem ersten produktiven Rechnungsabschluss ist die geprüfte Nummernübernahme erforderlich. Die vollständigen Abläufe stehen im [Handbuch](docs/handbuch.md).
 
-## Lokales Rechnungsprofil und Nummernübergabe
+## Warum diesem Werkzeug vertrauen?
 
-Ein neuer Workspace erhält sein Absenderprofil mit `buchhaltung rechnung configure --profile PROFIL_JSON_AUSSERHALB --last-number 0000`. Die Profildatei enthält `name`, `street`, `postal_code`, `city`, `country_iso`, `tax_number`, `small_business`, `tax_note` und `introduction`. Das vorhandene Profil nicht neu initialisieren. Der geprüfte Nummernstand muss mit dem Archiv übereinstimmen; bei einem neuen leeren Bestand ist er `0000`.
+Die [GoBD-Verfahrensdokumentation](docs/verfahrensdokumentation.md) erklärt die Kontrollen und ihre Grenzen. Die wichtigsten Anforderungen:
 
-Die Aktivierung liest einen zuvor geprüften lokalen Übergabebericht außerhalb beider Repos. Er enthält `version: 1`, `last_number` als numerischen Text, `inventory_complete: true`, `unfinalized: 0`, `external_numbering_stopped: true` und eine konkrete `verification_basis`. Diese Angaben sind ausdrücklich zu prüfen; ein Bericht beweist nicht selbst die Vollständigkeit eines früheren Dienstes. Erst nach gesonderter Freigabe:
+| Anforderung | Umsetzung und Einschränkung |
+|---|---|
+| Nachvollziehbarkeit und Ordnung | Originale, Metadaten und Korrekturen bleiben verknüpft; Änderungen werden protokolliert. |
+| Unveränderbarkeit | Originale werden nicht überschrieben; Git-Historie und bestätigte Bitcoin-Zeitnachweise machen Änderungen prüfbar. Administratoren können Daten trotzdem löschen; unabhängige Sicherungen bleiben erforderlich. |
+| Vollständigkeit, Richtigkeit, zeitgerechte Erfassung | Quellen-, Betrags- und Dublettenprüfungen helfen. Vollständigen Eingang, tatsächliche Zahlungen und rechtzeitige Erfassung musst du sicherstellen. |
+| Aufbewahrung und Datensicherheit | Verschlüsselte Originale, elfjährige Archivpolitik, keine automatische Löschung. Passwortsicherung, Zugriffsrechte und geprüfte Sicherungsmedien liegen bei dir. |
+| Lesbarkeit und Datenzugriff | Originale und Metadaten lassen sich vollständig exportieren. Benötigte Prüferauswertungen sind gesondert abzustimmen. |
+| Verfahrensdokumentation | Technische Beschreibung vorhanden; die [betrieblichen Angaben](docs/betriebliche-ergaenzung-vorlage.md) musst du privat ergänzen und aktuell halten. |
 
-```powershell
-.venv\Scripts\buchhaltung.exe rechnung activate --last-number GEPRUEFTE_NUMMER --handover 'UEBERGABEBERICHT_AUSSERHALB.json' --approved
-```
+Das ist **keine GoBD-Zertifizierung und keine vollständige EÜR**. Sondersteuerfälle sind nur eingeschränkt unterstützt. Git, Verschlüsselung und Zeitstempel allein ersetzen keinen ordnungsgemäßen Betrieb.
 
-Der Bericht wird mit Prüfbasis und SHA256 verschlüsselt als Übergabenachweis gespeichert. Vorbereitung, lokale Dublettenprüfung und Aktivierung benötigen keinen Zugriff auf einen früheren Rechnungsdienst. eBay/DHL/Vine-Abfragen für den eBay-Ablauf bleiben erhalten; sie senden keine Rechnung. Aktivierung und das Abschließen eines konkreten Entwurfs bleiben getrennte Freigaben.
-
-Schreibende Haupt-CLIs prüfen zuerst Datenrolle, exakte Git-Wurzel, privaten Remote und eine saubere veröffentlichte Toolversion. Danach laufen Archivprüfung, Dashboard, Datencommit/Push und ein separater OTS-Commit/Push im privaten Repo. Dessen `tool-version.json` hält den verwendeten Code-Commit fest. Ein OTS-Kalendernachweis ist zunächst ausstehend; `confirm` holt spätere Bitcoin-Bestätigungen nach und veröffentlicht geänderte Nachweise. Keine Geldbewegung oder E-Mail wird dadurch ausgeführt.
-
-## Sicherheit und Updates
-
-Die Einrichtung installiert Hooks: normale Commits/Pushes im Toolcheckout werden blockiert; der Datenhook prüft den Git-Index und erzeugt das Dashboard. Hooks sind Schutz gegen Versehen, keine absolute Berechtigungssperre. Die Buchhaltungs-CLIs prüfen das Ziel unabhängig davon; ein fehlendes `daten/.git` blockiert sie.
-
-Toolupdates erfolgen mit `git pull --ff-only` und anschließender Aktualisierung der Python-Abhängigkeiten. Offene Veröffentlichungen zuerst mit ihrer bisherigen Toolversion abschließen. Für bewusste Toolentwicklung lokal `git config bookkeeping.allowToolCommit true` setzen und danach wieder `false`. Das öffentliche Toolrepo enthält niemals die private Repo-Adresse.
-
-Nach einem Update `scripts/setup_workspace.py --hooks-only` ausführen. Der zusätzliche
-Daten-Pre-Push-Hook prüft den tatsächlichen origin-Push und die aktuelle GitHub-Privatheit
-auch bei manuellen Pushes. Die Haupt-CLIs prüfen sie vor schreibenden Vorgängen ebenfalls.
-`scripts/check_private_remote.py` führt die Prüfung allein lesend aus. Eigene vorhandene
-Hooks werden nicht überschrieben. Ein späterer Sichtbarkeitswechsel zwischen API-Prüfung
-und Push lässt sich dadurch nicht atomar ausschließen; die GitHub-Berechtigungen bleiben
-organisatorisch zu schützen. Hooks sind kein Schutz gegen bewusstes Umgehen.
-
-Öffentliche Maintainer-Commits benötigen einen bewusst gewählten öffentlichen Anzeigenamen und eine GitHub-Noreply-Adresse. `user.name`/`user.email` und `bookkeeping.publicName`/`bookkeeping.publicEmail` im lokalen Git-Config entsprechend setzen. Die Hooks prüfen den Index vor dem Commit sowie alle erreichbaren Commit-Versionen und die tatsächlich gepushten Referenzen vor dem Push. Belege, Datenbanken, Dashboard und Zeitnachweise dürfen ausschließlich ins private Datenrepo. Wenn die lokale Datenablage verfügbar ist, prüft `scripts/audit_public_repo.py` zusätzlich bekannte private Namen, Kennungen und Zugangswerte im Speicher. Prüfergebnisse enthalten keine gefundenen privaten Werte. Künstliche Testbeispiele verwenden erfundene Personen, Kennungen und Daten; echte Kundendaten gehören auch nicht in Tests.
-
-Der öffentliche Maintainer-Alias lautet `hutauf`. Die zwei bereits veröffentlichten Codecommits mit dem früheren Alias bleiben unverändert, damit bestehende Versionsverweise gültig bleiben. `.github/public-identities.toml` erlaubt die frühere Identität ausschließlich für diese beiden vollständigen Commit-Hashes; neue Commits müssen die aktuell konfigurierte Identität verwenden. Inhalt und Datenschutz werden auch für diese historischen Commits vollständig geprüft.
-
-Die CD-Sicherung enthält die öffentliche Toolhistorie als Bundle und die private Datenhistorie als zusätzlich verschlüsseltes Bundle. Historische Zeitnachweise aus einer Migration bleiben mit einem verschlüsselten Legacy-Bundle prüfbar. Brennen und Rücklesen erfolgen separat. Passwort unabhängig sichern; weder Timestamp noch Verschlüsselung allein bestätigen vollständige GoBD-/DSGVO-Konformität.
-
-## Entwicklung
-
-```powershell
-.venv\Scripts\python.exe -m pytest -q
-```
-
-Eigener Toolcode: MIT, siehe `LICENSE`. Die unveränderten CEN-EN16931-Validierungsartefakte stehen unter EUPL 1.2; Herkunft, Version und Prüfsummen liegen in `src/autobookkeeping/validation/`.
-
-Die vollständige Kombination enthält außerdem PyMuPDF/MuPDF unter AGPLv3.
-Kostenlose Nutzung hebt deren Pflichten nicht auf. Dieser Release bietet öffentlichen
-Toolquellcode und installiert Fremdpakete separat; keine ausschließlich-MIT-Zusage
-für die gesamte Kombination. Details: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-
-## Release-Prüfung
-
-`python scripts/release_smoke.py --output NEUER_TESTORDNER_AUSSERHALB` klont den
-eingecheckten Stand, installiert in zwei neuen Pythonumgebungen, richtet ein leeres
-lokales Bare-Datenrepo ein und prüft synthetische Rechnung/PDF/XML, Belegimport,
-Git-Push-Pipeline, Sicherung und Wiederherstellung. Es verwendet ausschließlich
-künstliche Daten, ein lokales Git-Push-Ziel und ausdrücklich simulierte OTS-Kalender;
-eBay/DHL/Vine, GitHub-API und Bitcoin werden dabei nicht live getestet.
-`report.json` bezeichnet diese Grenzen und die installierten Paketversionen.
-Der Test erzeugt keine Buchung im Nutzerrepo. CI prüft Python 3.11/3.13 unter Windows
-und Linux. Ein frisches Venv auf demselben Rechner ist kein physischer Ersatzrechner.
-Ohne Windows-Unterstützung langer Pfade einen kurzen Testpfad wie `C:\bk1` verwenden.
+[Versionen](CHANGELOG.md) · [Lizenzhinweise](THIRD_PARTY_NOTICES.md)

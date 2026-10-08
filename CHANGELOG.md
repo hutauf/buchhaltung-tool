@@ -1,5 +1,10 @@
 # Änderungen
 
+## Unveröffentlicht
+
+- README auf Einstieg, Anbindungen und GoBD-Kontrollen mit Grenzen gekürzt.
+- Ausführliche Referenz ins Handbuch verschoben; Zugänge und Rechnungsprofil separat erklärt, einschließlich der bestehenden Vine-Voraussetzung für eBay-Rechnungsentwürfe.
+
 ## 0.1.0-beta.1
 
 Erste Testversion zum Klonen des Toolrepos mit unabhängigem privatem Datenrepo.

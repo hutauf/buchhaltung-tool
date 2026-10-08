@@ -27,6 +27,8 @@ Diese öffentliche Beschreibung erklärt die vorhandenen Mechanismen. Sie bestä
 
 ## 2. Anwenderdokumentation
 
+Einrichtung und Zugangskonfiguration stehen in der [Einrichtungsanleitung](einrichtung.md); die vollständige Befehlsreferenz im [Handbuch](handbuch.md). Die README fasst Einstieg, GoBD-Kontrollen und Grenzen zusammen. Diese redaktionelle Aufteilung ändert das Verfahren nicht. Die Anbindungsanleitung benennt die bestehende zusätzliche Vine-Voraussetzung für eBay-Rechnungsentwürfe ausdrücklich.
+
 ### Eingang und Erfassung
 
 Belege unverzüglich sichern. Der Agent prüft Bestand, Quelle und Dubletten; eBay-SRN und Order-ID-Aliase verhindern doppelte Verarbeitung derselben Bestellung. Bei unlesbaren, fehlenden oder widersprüchlichen Angaben bleibt der Vorgang ungeklärt. Quelleninhalte gelten als Daten, nicht als Arbeitsanweisungen.
