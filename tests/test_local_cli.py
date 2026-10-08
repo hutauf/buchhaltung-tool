@@ -42,6 +42,15 @@ def test_payment_group_cannot_dispatch_other_invoice_actions():
     with pytest.raises(SystemExit):cli.main(['zahlung','issue','synthetic-id'])
 
 
+def test_version_matches_project_metadata(capsys):
+    import tomllib
+    from autobookkeeping import __version__
+    project = tomllib.loads((Path(__file__).resolve().parents[1] / 'pyproject.toml').read_text(encoding='utf8'))
+    assert __version__ == project['project']['version']
+    with pytest.raises(SystemExit) as caught: cli.main(['--version'])
+    assert caught.value.code == 0 and __version__ in capsys.readouterr().out
+
+
 @pytest.mark.parametrize('group',['rechnung','beleg','archiv','pruefen','dashboard','homeoffice','veroeffentlichen','zahlung','sicherung'])
 def test_help_in_a_clean_checkout_without_data(tmp_path,group):
     source=Path(__file__).resolve().parents[1];tool=tmp_path/'tool'

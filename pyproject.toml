@@ -1,6 +1,6 @@
 [project]
 name = "buchhaltung-tool"
-version = "0.1.0"
+version = "0.1.0b1"
 description = "Encrypted local bookkeeping, invoice drafts and auditable Git/OpenTimestamps workflows."
 requires-python = ">=3.11"
 dependencies = [

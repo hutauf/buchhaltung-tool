@@ -7,7 +7,7 @@ import re
 import subprocess
 from pathlib import Path
 
-ROOT_FILES={'.bookkeeping-tool.json','.gitattributes','.gitignore','AGENTS.md','README.md','LICENSE','pyproject.toml','requirements.txt'}
+ROOT_FILES={'.bookkeeping-tool.json','.gitattributes','.gitignore','AGENTS.md','README.md','LICENSE','CHANGELOG.md','THIRD_PARTY_NOTICES.md','pyproject.toml','requirements.txt'}
 DIRECTORIES={'src','scripts','tests','docs','skills','.github','.githooks'}
 SUFFIXES={'.py','.md','.html','.toml','.txt','.yaml','.yml'}
 VALIDATION_FILES={'src/autobookkeeping/validation/'+name for name in

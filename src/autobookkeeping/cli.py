@@ -46,9 +46,13 @@ def command(argv):
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     parser = argparse.ArgumentParser(description="Lokale verschluesselte Buchhaltung")
+    from autobookkeeping import __version__
+    parser.add_argument('--version', action='version', version='buchhaltung ' + __version__)
     parser.add_argument("bereich", nargs="?", choices=ROUTES, help="; ".join(k+": "+v[2] for k,v in ROUTES.items()))
     if not argv or argv[0] in ("--help", "-h"):
         parser.print_help(); return 0
+    if argv[0] == '--version':
+        parser.parse_args(argv); return 0
     parser.parse_args([argv[0]])
     try: route = command(argv)
     except ValueError as exc: parser.error(str(exc))

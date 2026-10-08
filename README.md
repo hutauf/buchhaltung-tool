@@ -1,5 +1,9 @@
 # Lokale Buchhaltung
 
+Version **0.1.0-beta.1** (`buchhaltung --version`: `0.1.0b1`). Installation erfolgt
+aus dem Git-Checkout; kein eigenständiges Wheel/PyPI-Installationsangebot.
+Release-Umfang und Grenzen stehen in [CHANGELOG.md](CHANGELOG.md).
+
 Ein Werkzeug für eine eigene verschlüsselte Buchhaltungsablage, lokale Rechnungsentwürfe, Belegimport, EÜR-Arbeitsübersicht und Git-/OpenTimestamps-Nachweise. Kleinunternehmerfälle sowie ausdrücklich geprüfte inländische 7-/19-%-Positionen werden unterstützt. Sondersteuerfälle und eine abgabefertige Steuererklärung sind nicht vollständig abgebildet.
 
 Der aktuelle Umfang sind **einzelne EÜR-Einträge**, vor allem Verkäufe und zugehörige Ausgaben wie Porto und Marktplatzgebühren. Vine-Entnahmen und eine vollständige EÜR folgen erst in späteren Schritten. Die [Verfahrensdokumentation](docs/verfahrensdokumentation.md) beschreibt technische Kontrollen, organisatorische Pflichten und offene Punkte. Vor dem betrieblichen Einsatz die [betriebliche Ergänzung](docs/betriebliche-ergaenzung-vorlage.md) privat ausfüllen; diese Vorlage ist kein Konformitätsnachweis.
@@ -53,6 +57,11 @@ Dieses öffentliche Repository enthält ausschließlich Code, Vorlagen, Skills u
 
 Python 3.11+ und Git installieren. Ein leeres privates Datenrepo bei GitHub anlegen und das Tool klonen. Im Toolordner:
 
+Unter Windows ohne aktivierte Unterstützung langer Pfade einen kurzen Toolpfad
+verwenden, beispielsweise `C:\bk\tool`. Factur-X enthält sehr umfangreiche Schemanamen; eine
+Installation tief verschachtelt unter Downloads/Benutzerordner kann deshalb scheitern.
+Das Tool verändert keine systemweite Windows-Pfadeinstellung.
+
 ```powershell
 py -m venv .venv
 .venv\Scripts\python.exe -m pip install -e ".[test]"
@@ -60,6 +69,18 @@ py -m venv .venv
 ```
 
 In `daten/.env` lokal `ENCRYPTION_PASSWORD` hinterlegen. Optional benötigte eBay-, GMX- und Vine-Zugangswerte ebenfalls dort konfigurieren; nichts davon committen. Git-Autor im privaten Repo konfigurieren. Vor dem ersten Archiv-CLI muss dort ein initialer Commit mit Rollenmarkierung und Konfiguration existieren und nach `origin/main` gepusht sein:
+
+Bereits vor der Einrichtung bestätigt eine authentifizierte GitHub-API-Abfrage
+die tatsächliche Sichtbarkeit `private`. Verwendet werden `GH_TOKEN`/`GITHUB_TOKEN`
+aus Umgebung beziehungsweise `daten/.env` oder vorhandene Git-Credentials für
+`github.com`. Bei einem neuen Workspace Tokens gegebenenfalls zunächst in der
+Prozessumgebung bereitstellen. Lesender Repository-Metadatenzugriff genügt.
+Ein reiner SSH-Schlüssel gewährt diesen API-Zugriff nicht. Zugangswerte werden nicht
+ausgegeben; es gibt keinen automatischen Login und keine Erweiterung von Rechten.
+API-Ausfall, fehlende Berechtigung, public/internal und unbestätigte Umbenennung
+blockieren Einrichtung/Veröffentlichung. GitHub Enterprise und fremde Netzwerkremotes
+werden derzeit nicht unterstützt. Lokale vorhandene Bare-Repos dienen Offline-Tests;
+für sie wird keine GitHub-Privatheit behauptet.
 
 ```powershell
 git -C daten add .bookkeeping-data.json .gitignore .gitattributes workspace.json AGENTS.md verfahrensdokumentation.md buchhaltung
@@ -122,6 +143,14 @@ Die Einrichtung installiert Hooks: normale Commits/Pushes im Toolcheckout werden
 
 Toolupdates erfolgen mit `git pull --ff-only` und anschließender Aktualisierung der Python-Abhängigkeiten. Offene Veröffentlichungen zuerst mit ihrer bisherigen Toolversion abschließen. Für bewusste Toolentwicklung lokal `git config bookkeeping.allowToolCommit true` setzen und danach wieder `false`. Das öffentliche Toolrepo enthält niemals die private Repo-Adresse.
 
+Nach einem Update `scripts/setup_workspace.py --hooks-only` ausführen. Der zusätzliche
+Daten-Pre-Push-Hook prüft den tatsächlichen origin-Push und die aktuelle GitHub-Privatheit
+auch bei manuellen Pushes. Die Haupt-CLIs prüfen sie vor schreibenden Vorgängen ebenfalls.
+`scripts/check_private_remote.py` führt die Prüfung allein lesend aus. Eigene vorhandene
+Hooks werden nicht überschrieben. Ein späterer Sichtbarkeitswechsel zwischen API-Prüfung
+und Push lässt sich dadurch nicht atomar ausschließen; die GitHub-Berechtigungen bleiben
+organisatorisch zu schützen. Hooks sind kein Schutz gegen bewusstes Umgehen.
+
 Öffentliche Maintainer-Commits benötigen einen bewusst gewählten öffentlichen Anzeigenamen und eine GitHub-Noreply-Adresse. `user.name`/`user.email` und `bookkeeping.publicName`/`bookkeeping.publicEmail` im lokalen Git-Config entsprechend setzen. Die Hooks prüfen den Index vor dem Commit sowie alle erreichbaren Commit-Versionen und die tatsächlich gepushten Referenzen vor dem Push. Belege, Datenbanken, Dashboard und Zeitnachweise dürfen ausschließlich ins private Datenrepo. Wenn die lokale Datenablage verfügbar ist, prüft `scripts/audit_public_repo.py` zusätzlich bekannte private Namen, Kennungen und Zugangswerte im Speicher. Prüfergebnisse enthalten keine gefundenen privaten Werte. Künstliche Testbeispiele verwenden erfundene Personen, Kennungen und Daten; echte Kundendaten gehören auch nicht in Tests.
 
 Der öffentliche Maintainer-Alias lautet `hutauf`. Die zwei bereits veröffentlichten Codecommits mit dem früheren Alias bleiben unverändert, damit bestehende Versionsverweise gültig bleiben. `.github/public-identities.toml` erlaubt die frühere Identität ausschließlich für diese beiden vollständigen Commit-Hashes; neue Commits müssen die aktuell konfigurierte Identität verwenden. Inhalt und Datenschutz werden auch für diese historischen Commits vollständig geprüft.
@@ -135,3 +164,21 @@ Die CD-Sicherung enthält die öffentliche Toolhistorie als Bundle und die priva
 ```
 
 Eigener Toolcode: MIT, siehe `LICENSE`. Die unveränderten CEN-EN16931-Validierungsartefakte stehen unter EUPL 1.2; Herkunft, Version und Prüfsummen liegen in `src/autobookkeeping/validation/`.
+
+Die vollständige Kombination enthält außerdem PyMuPDF/MuPDF unter AGPLv3.
+Kostenlose Nutzung hebt deren Pflichten nicht auf. Dieser Release bietet öffentlichen
+Toolquellcode und installiert Fremdpakete separat; keine ausschließlich-MIT-Zusage
+für die gesamte Kombination. Details: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+## Release-Prüfung
+
+`python scripts/release_smoke.py --output NEUER_TESTORDNER_AUSSERHALB` klont den
+eingecheckten Stand, installiert in zwei neuen Pythonumgebungen, richtet ein leeres
+lokales Bare-Datenrepo ein und prüft synthetische Rechnung/PDF/XML, Belegimport,
+Git-Push-Pipeline, Sicherung und Wiederherstellung. Es verwendet ausschließlich
+künstliche Daten, ein lokales Git-Push-Ziel und ausdrücklich simulierte OTS-Kalender;
+eBay/DHL/Vine, GitHub-API und Bitcoin werden dabei nicht live getestet.
+`report.json` bezeichnet diese Grenzen und die installierten Paketversionen.
+Der Test erzeugt keine Buchung im Nutzerrepo. CI prüft Python 3.11/3.13 unter Windows
+und Linux. Ein frisches Venv auf demselben Rechner ist kein physischer Ersatzrechner.
+Ohne Windows-Unterstützung langer Pfade einen kurzen Testpfad wie `C:\bk1` verwenden.

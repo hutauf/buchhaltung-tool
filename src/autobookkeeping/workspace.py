@@ -26,7 +26,7 @@ def assert_git_root(repo):
     return repo
 
 
-def assert_data_repo(repo, remote=False):
+def assert_data_repo(repo, remote=False, require_upstream=True):
     repo = assert_git_root(repo)
     if (repo / '.bookkeeping-tool.json').exists():
         raise WorkflowError('Toolrepo ist kein Buchhaltungsziel')
@@ -37,13 +37,15 @@ def assert_data_repo(repo, remote=False):
         configuration = json.loads((repo / 'workspace.json').read_bytes())
         expected = configuration.get('expected_push_url')
         urls = git(repo, 'remote', 'get-url', '--push', '--all', 'origin').decode().splitlines()
-        upstream = git(repo, 'rev-parse', '--abbrev-ref', '@{upstream}').decode().strip()
+        upstream = git(repo, 'rev-parse', '--abbrev-ref', '@{upstream}').decode().strip() if require_upstream else 'origin/initial'
         if not expected or urls != [expected] or not upstream.startswith('origin/'):
             raise WorkflowError('Push-Ziel stimmt nicht mit dem freigegebenen privaten Repo überein')
         try: public_urls = git(tool_root(), 'remote', 'get-url', '--push', '--all', 'origin').decode().splitlines()
         except subprocess.CalledProcessError: public_urls = []
         if any(repository_identity(url) == repository_identity(expected) for url in public_urls):
             raise WorkflowError('Tool- und Datenrepo müssen verschiedene Push-Ziele besitzen')
+        from autobookkeeping.repository_privacy import assert_private_remote
+        assert_private_remote(expected, repo)
     return repo
 
 

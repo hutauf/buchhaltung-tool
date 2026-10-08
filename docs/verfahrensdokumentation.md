@@ -1,6 +1,6 @@
 # Verfahrensdokumentation der lokalen Belegablage
 
-Version 3 · Technikstand 08.10.2026, rechtliche Grundlagen zuletzt geprüft am 07.10.2026. Änderungen dieser Beschreibung werden mit der Toolhistorie versioniert. Die im privaten Workspace verwendete Toolrevision steht in `tool-version.json`.
+Version 4 · Technikstand 08.10.2026, rechtliche Grundlagen zuletzt geprüft am 07.10.2026. Änderungen dieser Beschreibung werden mit der Toolhistorie versioniert. Die im privaten Workspace verwendete Toolrevision steht in `tool-version.json`.
 
 ## 1. Allgemeine Beschreibung
 
@@ -151,3 +151,27 @@ OTS belegt die Existenz des gehashten Commitnachweises spätestens am bestätigt
 `veroeffentlichen confirm` aktualisiert OTS-Dateien und prüft Bitcoin-Anker samt historischem Gitbezug über zwei öffentliche Blockquellen. Sein privater Verifikationscache bindet das Ergebnis an SHA256 der genauen Nachweis- und OTS-Datei. Das Dashboard zählt nur übereinstimmende gespeicherte Verifikationen als geprüft; geänderte Beweise werden nicht mit einem alten Cache bestätigt. Nachweis-/Cache-/Dashboardänderungen erhalten einen eigenen privaten Nachweisupdate-Commit ohne neue finanzielle Buchung und ohne rekursiv immer neue Zeitstempel zu erzeugen. Die öffentlichen Quellen ersetzen keinen unabhängig betriebenen Bitcoin-Vollknoten.
 
 Toolupdates werden getestet und nur allgemein im öffentlichen Repo veröffentlicht. Der private Workspace dokumentiert die verwendete Toolrevision. Jede Funktionsänderung muss die öffentliche Verfahrensbeschreibung und erforderlichen privaten Betriebsangaben im selben Entwicklungsschritt prüfen und aktualisieren; organisatorische Unbekannte bleiben offen. Änderungen am Verfahren und organisatorische Abweichungen werden zusätzlich privat datiert und mit vorherigem Stand aufbewahrt. Vor Änderungen an Aufbewahrung, Export oder Rechnungsformaten vorhandene Originale und historische Nachweise verifizieren. Kein rückwirkendes Ersetzen empfangener PDFs durch selbst erzeugte XML.
+
+### Release- und Zugriffskontrollen ab 0.1.0-beta.1
+
+Einrichtung, schreibende Haupt-CLIs und der erzeugte Daten-Pre-Push-Hook prüfen die
+tatsächliche GitHub-Sichtbarkeit über authentifizierte Metadatenabfrage. Erwartete
+Adresse, `full_name`, `private: true` und `visibility: private` müssen übereinstimmen.
+API-/Authentifizierungsfehler, fremde Netzwerkremotes und unbestätigte Umbenennungen
+sperren die Veröffentlichung. Die Prüfung verwendet nur bereits vorhandene
+Git-Credentials oder lokal konfigurierte Tokens mit lesendem Metadatenzugriff.
+Einmalige Prüfung ist keine dauerhafte Zusicherung; zwischen Abfrage und Push ist
+kein atomarer Sichtbarkeitsschutz möglich. GitHub-Berechtigungen und bewusstes
+Umgehen von Hooks bleiben organisatorisch zu kontrollieren. Lokale Bare-Repos im
+isolierten Entwicklungstest sind keine bestätigten privaten GitHub-Repos.
+
+Versionen werden mit unveränderlichen Git-Tags und `CHANGELOG.md` beschrieben;
+Python-Version und Gitrevision bleiben identifizierbar. Der Release-Test erzeugt
+in einem separaten Klon zwei frische Pythonumgebungen für Installation und Restore,
+mit ausschließlich synthetischen Buchungen und simulierter externer OTS-Antwort.
+Quellen-/GitHub-/Bitcoin-Liveprüfungen sind davon getrennt. Das Testprotokoll erfasst
+Paketversionen und Grenzen. Ein frisches Venv ist kein getesteter physischer
+Ersatzrechner. Eigenständige Wiederherstellung des Nutzerbestands ist ein lesender
+separater Test, keine neue Buchung; Durchführung nur bei tatsächlichem Ergebnis
+privat dokumentieren. Die MIT-Lizenz eigenen Codes ersetzt nicht AGPL-/EUPL-Pflichten
+der mitverwendeten Bibliotheken; `THIRD_PARTY_NOTICES.md` bleibt Teil der Sicherung.

@@ -509,7 +509,7 @@ def cd_export(archive: Archive, target: Path) -> dict:
     # Include every tracked runtime module, schema, skill and procedure document.
     names = git(tool, 'ls-files', '-z').decode().split('\0')
     for name in names:
-        if name and (name.startswith(('src/', 'scripts/', 'skills/', 'docs/')) or name in ('pyproject.toml','README.md','LICENSE','AGENTS.md')):
+        if name and (name.startswith(('src/', 'scripts/', 'skills/', 'docs/')) or name in ('pyproject.toml','README.md','LICENSE','THIRD_PARTY_NOTICES.md','CHANGELOG.md','AGENTS.md')):
             atomic(within(target, name), (tool / name).read_bytes())
     if (archive.repo / 'dashboard.html').exists():atomic(target / 'dashboard.html',(archive.repo / 'dashboard.html').read_bytes())
     from autobookkeeping.local_invoices import now

@@ -9,6 +9,7 @@ TOOL = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(TOOL / 'src'))
 from autobookkeeping.workspace import assert_git_root, assert_data_repo, git, git_environment
 from autobookkeeping.archive import atomic, encoded
+from autobookkeeping.repository_privacy import assert_private_remote
 
 
 def install_hooks():
@@ -28,12 +29,17 @@ def install_hooks():
     directory = Path(git(data, 'rev-parse', '--git-path', 'hooks').decode().strip())
     if not directory.is_absolute(): directory = data / directory
     python = TOOL / '.venv/Scripts/python.exe' if sys.platform == 'win32' else TOOL / '.venv/bin/python'
-    hook = ("#!/bin/sh\n# bookkeeping-workspace generated hook\nexec '" + python.as_posix() + "' -X utf8 '" +
-            (TOOL / 'scripts/build_bookkeeping_dashboard.py').as_posix() + "' --staged\n").encode()
-    destination = directory / 'pre-commit'
-    if destination.exists() and b'bookkeeping-workspace generated hook' not in destination.read_bytes():
-        raise ValueError('Vorhandener eigener Daten-Hook bleibt unverändert; bewusst integrieren')
-    atomic(destination, hook); destination.chmod(0o755)
+    hooks = {'pre-commit': ('build_bookkeeping_dashboard.py', ' --staged'),
+             'pre-push': ('check_private_remote.py', '')}
+    for name in hooks:
+        destination = directory / name
+        if destination.exists() and b'bookkeeping-workspace generated hook' not in destination.read_bytes():
+            raise ValueError('Vorhandener eigener Daten-Hook bleibt unverändert; bewusst integrieren')
+    for name, (script, arguments) in hooks.items():
+        hook = ("#!/bin/sh\n# bookkeeping-workspace generated hook\nexec '" + python.as_posix() + "' -X utf8 '" +
+                (TOOL / 'scripts' / script).as_posix() + "'" + arguments + (' "$@"' if name == 'pre-push' else '') + "\n").encode()
+        destination = directory / name
+        atomic(destination, hook); destination.chmod(0o755)
 
 
 def main():
@@ -43,9 +49,13 @@ def main():
     data = TOOL / 'daten'
     if args.hooks_only: install_hooks(); print('Lokale Git-Sperren installiert'); return
     if not args.data_url: raise ValueError('--data-url für das private GitHub-Repo angeben')
+    assert_private_remote(args.data_url, data)
     if not data.exists():
         subprocess.run(['git','clone','--',args.data_url,str(data)], env=git_environment(), check=True)
     assert_git_root(data)
+    try: git(data, 'rev-parse', '--verify', 'HEAD')
+    except subprocess.CalledProcessError:
+        git(data, 'symbolic-ref', 'HEAD', 'refs/heads/main')
     if not (data / '.bookkeeping-data.json').exists():
         atomic(data / '.bookkeeping-data.json', encoded({'version':1,'role':'data'}))
         atomic(data / '.gitignore', b'.env\n.env.*\noutput/\ndownloads/\n')
