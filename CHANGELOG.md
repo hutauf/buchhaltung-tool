@@ -2,6 +2,8 @@
 
 ## Unveröffentlicht
 
+- Große Datenveröffentlichungen übergeben Git-Dateipfade über Standardeingabe; dadurch bleibt der Git-Befehl unter der Windows-Befehlslängengrenze. Nur die ausgewählten Dateien werden aufgenommen.
+
 - README auf Einstieg, Anbindungen und GoBD-Kontrollen mit Grenzen gekürzt.
 - Ausführliche Referenz ins Handbuch verschoben; Zugänge und Rechnungsprofil separat erklärt, einschließlich der bestehenden Vine-Voraussetzung für eBay-Rechnungsentwürfe.
 

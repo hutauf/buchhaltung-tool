@@ -2,6 +2,8 @@
 
 Die [README](../README.md) enthält die Installationsbefehle für einen neuen Windows-Workspace. Hier stehen Zugangsdaten, Rechnungsprofil und Hinweise für bestehende Installationen. Alle Buchhaltungsbefehle im äußeren Toolordner starten.
 
+Wenn Windows den Befehl `py` nicht kennt, `python -m venv .venv` verwenden. Ist auch `python` nicht im Suchpfad, den vollständigen Pfad zum installierten Python-Interpreter verwenden; Python 3.11 oder neuer bleibt erforderlich.
+
 ## GitHub-Zugang
 
 Ein leeres **privates** Datenrepo anlegen, ohne vorab README oder andere Dateien hinzuzufügen. `setup_workspace.py` klont es unter `daten/`; öffentliches Tool und private Daten bleiben unabhängige Repositories.

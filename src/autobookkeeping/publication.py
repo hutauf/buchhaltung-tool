@@ -16,9 +16,9 @@ from autobookkeeping.timestamps import load_proof
 from autobookkeeping.workspace import assert_data_repo, assert_tool_clean, tool_root, git as workspace_git
 
 
-def git(repo, *args):
+def git(repo, *args, input=None):
     assert_data_repo(repo)
-    return workspace_git(repo, *args)
+    return workspace_git(repo, *args, input=input)
 
 
 def data_path(name):
@@ -99,7 +99,10 @@ class Publication:
     def commit_paths(self, names, message):
         staged = set(self.names("diff", "--cached", "--name-only", "-z"))
         if not staged <= set(names): raise WorkflowError("Fremde Git-Indexänderung; Veröffentlichung gestoppt")
-        git(self.repo, "add", "--", *names)
+        # Keep argv bounded even when a first import contains hundreds of files.
+        # NUL separation and literal matching preserve spaces, Unicode and brackets.
+        git(self.repo, "--literal-pathspecs", "add", "--pathspec-from-file=-", "--pathspec-file-nul",
+            input=b"".join(name.encode("utf8") + b"\0" for name in names))
         if set(self.names("diff", "--cached", "--name-only", "-z")) - set(names):
             raise WorkflowError("Git-Index enthält fremde Dateien")
         git(self.repo, "commit", "-m", message)

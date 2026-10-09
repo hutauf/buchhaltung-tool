@@ -104,15 +104,47 @@ def test_full_pipeline_preserves_unrelated_edits_and_is_idempotent(fixture):
     assert git('rev-list', '--count', 'HEAD') == '3'
 
 
+def test_large_file_batch_uses_bounded_argv_and_literal_paths(fixture, monkeypatch):
+    repo, archive, git = fixture
+    names = ['buchhaltung/2026/Unterlagen/' + ('a' * 80) + f'-{i:04d}.enc' for i in range(600)]
+    names.append('buchhaltung/2026/Unterlagen/synthetisch [1] ä.enc')
+    assert len(' '.join(names)) > 32767
+    for name in names:
+        path = repo / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b'Synthetic staging fixture')
+    unrelated = repo / 'buchhaltung/2026/Unterlagen/synthetisch 1 ä.enc'
+    unrelated.write_bytes(b'Unrelated synthetic file')
+    original = module.git
+    staging = []
+
+    def capture(repo, *args, **kwargs):
+        if 'add' in args:
+            staging.append((args, kwargs['input']))
+        return original(repo, *args, **kwargs)
+
+    monkeypatch.setattr(module, 'git', capture)
+    Publication(repo, 'synthetic batch').commit_paths(names, 'Synthetic large batch')
+    assert len(staging) == 1
+    args, payload = staging[0]
+    assert len(' '.join(args)) < 256
+    assert payload.split(b'\0')[:-1] == [name.encode('utf8') for name in sorted(names)]
+    committed = subprocess.check_output(['git', '-C', str(repo), 'diff-tree',
+        '--no-commit-id', '--name-only', '-r', '-z', 'HEAD']).decode().split('\0')[:-1]
+    assert set(committed) == set(names)
+    assert unrelated.relative_to(repo).as_posix() not in committed
+    assert git('status', '--porcelain')
+
+
 @pytest.mark.parametrize('push_number', [1, 2])
 def test_push_failure_resumes_without_rebooking(fixture, monkeypatch, push_number):
     repo, archive, git = fixture; original = module.git; pushes = 0
-    def fail(repo, *args):
+    def fail(repo, *args, **kwargs):
         nonlocal pushes
         if args[0] == 'push':
             pushes += 1
             if pushes == push_number: raise OSError('Synthetic network failure')
-        return original(repo, *args)
+        return original(repo, *args, **kwargs)
     monkeypatch.setattr(module, 'git', fail)
     with pytest.raises(OSError): save(repo, archive)
     assert (repo / 'output/publication.json').exists()
@@ -161,9 +193,9 @@ def test_preflight_blocks_before_mutation(fixture, monkeypatch, obstacle):
 
 def test_changed_archive_blocks_resume(fixture, monkeypatch):
     repo, archive, git = fixture; original = module.git
-    def fail(repo, *args):
+    def fail(repo, *args, **kwargs):
         if args[0] == 'push': raise OSError('Offline')
-        return original(repo, *args)
+        return original(repo, *args, **kwargs)
     monkeypatch.setattr(module, 'git', fail)
     with pytest.raises(OSError): save(repo, archive)
     record(LocalInvoices(archive), 2026, 101, 'Foreign change', True, True)

@@ -14,8 +14,9 @@ def git_environment():
     return {k:v for k,v in os.environ.items() if not k.startswith('GIT_') or k in ('GIT_SSH_COMMAND', 'GIT_TERMINAL_PROMPT')}
 
 
-def git(repo, *args):
-    return subprocess.check_output(['git', '-C', str(repo), *args], env=git_environment(), stderr=subprocess.PIPE, timeout=60)
+def git(repo, *args, input=None):
+    return subprocess.check_output(['git', '-C', str(repo), *args], input=input,
+                                   env=git_environment(), stderr=subprocess.PIPE, timeout=60)
 
 
 def assert_git_root(repo):

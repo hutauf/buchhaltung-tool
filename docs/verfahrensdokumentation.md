@@ -49,6 +49,8 @@ Ein einfaches PDF ist keine strukturierte E-Rechnung. Bei hybriden Rechnungen is
 
 Schreibende Hauptbefehle führen Archivprüfung, Dashboarderzeugung, Datencommit und Push sowie einen separaten Commit/Push des OTS-Nachweises aus. Ein Pipelinefehler wird mit `veroeffentlichen status` geprüft und mit `resume` fortgesetzt; die Buchung nicht wiederholen. Bitcoin-Bestätigung mit `confirm` später prüfen. Ein ausstehender Nachweis ist kein bestätigter Blockchain-Zeitpunkt.
 
+Die ausgewählten Commit-Dateipfade werden als unveränderte, nullgetrennte Liste über die Standardeingabe an Git übergeben. Damit lassen sich auch umfangreiche Erstimporte unter Windows veröffentlichen, ohne die Befehlslängengrenze zu überschreiten; andere Dateien werden weiterhin nicht aufgenommen. Ein dienstunabhängiger öffentlicher Batch-Importbefehl ist noch nicht vorhanden.
+
 Das Dashboard enthält eine fest begrenzte Projektion ohne Käufer, Anschriften oder Artikeltexte. Es ist eine Übersicht erfasster einzelner EÜR-Einträge. Zahlungen, Belegbeträge und Pauschalen sind getrennt. Beleg-/Zahlungsstichtage und Sonderzuordnungen sind mit den übrigen Unternehmensaufzeichnungen zusammenzuführen. CSV aus dem Dashboard ist ein Arbeitsbericht, kein vollständiger Prüfexport.
 
 ## 3. Technische Systemdokumentation
