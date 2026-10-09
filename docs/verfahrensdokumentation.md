@@ -53,6 +53,8 @@ Die ausgewählten Commit-Dateipfade werden als unveränderte, nullgetrennte List
 
 Das Dashboard enthält eine fest begrenzte Projektion ohne Käufer, Anschriften oder Artikeltexte. Es ist eine Übersicht erfasster einzelner EÜR-Einträge. Zahlungen, Belegbeträge und Pauschalen sind getrennt. Beleg-/Zahlungsstichtage und Sonderzuordnungen sind mit den übrigen Unternehmensaufzeichnungen zusammenzuführen. CSV aus dem Dashboard ist ein Arbeitsbericht, kein vollständiger Prüfexport.
 
+Der Belegart-Filter „Storno / Teilerstattung“ zeigt separate Minderungsbelege sowie stornierte oder teilweise geminderte Originalrechnungen. Ein importierter Storno-Status bleibt an der Originalrechnung erhalten; der Filter erzeugt daraus keinen neuen Stornobeleg und keine Rückzahlung. „Prüfung → Storniert“ grenzt auf stornierte Originalrechnungen ein. Jahres-, Such- und übrige Filter gelten weiterhin; „Alle Jahre“ zeigt auch historische Vorgänge.
+
 ## 3. Technische Systemdokumentation
 
 Das öffentliche Toolrepo enthält Code, Dokumentation, Regeln und künstliche Tests. Das unabhängige private Repo unter `daten/` enthält verschlüsselte Originale, `database.json.enc`, Checkliste, Manifest, Nachweise, Dashboard und die verwendete Toolrevision. Der Toolcheckout ignoriert `daten/` vollständig. Prüfkopien und entschlüsselte Ansichten liegen außerhalb beider Repos.

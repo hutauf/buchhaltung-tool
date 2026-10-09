@@ -103,3 +103,38 @@ def test_local_invoice_draft_without_kind_or_source_has_completion_number():
     assert public["proposed_number"] == "0901" and public["document_type"] == "invoice"
     assert snapshot["homeoffice_default_days"] == 210
     assert "private-draft" not in json.dumps(snapshot)
+
+
+def test_actual_dashboard_filter_includes_cancelled_originals_without_reclassifying_them():
+    node = shutil.which('node')
+    if not node:
+        pytest.skip('Node is needed to execute the dashboard JavaScript')
+    template = (ROOT/'scripts/dashboard_view.html').read_text(encoding='utf8')
+    script = template.split('<script>')[1].split('function drawChart')[0]
+    rows = [dict(kind=kind, status=status, number=str(i), date='2011-01-02', flows=[], warnings=[],
+                 coverage='complete', expense_category=None)
+            for i, (kind, status) in enumerate([
+                ('invoice','paid'), ('invoice','cancelled'), ('invoice','locally_cancelled'),
+                ('invoice','partially_credited'), ('credit_note','issued'), ('expense','cancelled')])]
+    program = r"""
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const input=JSON.parse(fs.readFileSync(0,'utf8'));
+const controls={};
+for(const key of ['year','kind','category','quality','search'])controls[key]={value:key==='search'?'':'all'};
+controls['bookkeeping-data']={textContent:JSON.stringify({rows:input.rows})};
+const context={document:{getElementById:id=>controls[id]},console};
+vm.createContext(context);
+vm.runInContext(input.script,context);
+function filter(kind,quality='all',year='all'){
+ controls.kind.value=kind;controls.quality.value=quality;controls.year.value=year;
+ return Array.from(vm.runInContext('scopeRows().map(row=>row.number).sort()',context));
+}
+assert.deepStrictEqual(filter('credit_note'),['1','2','3','4']);
+assert.deepStrictEqual(filter('invoice'),['0','1','2','3']);
+assert.deepStrictEqual(filter('credit_note','cancelled'),['1','2']);
+assert.deepStrictEqual(filter('credit_note','all','2012'),[]);
+assert.deepStrictEqual(filter('expense'),['5']);
+assert.deepStrictEqual(JSON.parse(controls['bookkeeping-data'].textContent).rows,input.rows);
+"""
+    subprocess.run([node,'-e',program],input=json.dumps({'script':script,'rows':rows}).encode(),
+                   capture_output=True,check=True,timeout=15)
