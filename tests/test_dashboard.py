@@ -6,7 +6,7 @@ import subprocess
 from pathlib import Path
 import pytest
 from autobookkeeping.archive import Archive, sha
-from autobookkeeping.dashboard import projection, html, public_day, public_number
+from autobookkeeping.dashboard import projection, html, public_day, public_number, public_retention
 
 ROOT=Path(__file__).resolve().parents[1]
 SCRIPT=runpy.run_path(str(ROOT/"scripts/build_bookkeeping_dashboard.py"))
@@ -138,3 +138,76 @@ assert.deepStrictEqual(JSON.parse(controls['bookkeeping-data'].textContent).rows
 """
     subprocess.run([node,'-e',program],input=json.dumps({'script':script,'rows':rows}).encode(),
                    capture_output=True,check=True,timeout=15)
+
+
+def test_retention_projection_preserves_later_event_horizons_without_document_paths():
+    from autobookkeeping.retention import report
+    name='PRIVATE_ORIGINAL_PATH.pdf.enc'
+    source=dict(row(), documents=[name])
+    catalog={'records':{'opaque-1':{'current':source,'history':[]}},
+             'documents':{name:{},'PRIVATE_UNKNOWN_PATH.enc':{}},
+             'cash_events':{'synthetic-payment':{'record_id':'opaque-1','date':'2012-01-01'}},
+             'cash_event_voids':{'synthetic-payment':{'at':'2013-01-01'}}}
+    public=projection(catalog,'0'*64)
+    assert public['retention']=={'retention_years':11,'documents':2,'unknown':1,
+                                'groups':[{'earliest_review':'2025-01-01','documents':1}]}
+    assert report(catalog,'2024-12-31')['documents'][0]['earliest_review']=='2025-01-01'
+    assert 'PRIVATE' not in json.dumps(public)
+    assert public_retention({})=={'retention_years':11,'documents':0,'unknown':0,'groups':[]}
+
+
+def test_offline_retention_javascript_uses_berlin_day_and_exact_year_boundary():
+    node=shutil.which('node')
+    if not node:pytest.skip('Node is needed to execute the dashboard JavaScript')
+    script=(ROOT/'scripts/dashboard_view.html').read_text(encoding='utf8').split('<script>')[1].split('function drawChart')[0]
+    program=r"""
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const input=JSON.parse(fs.readFileSync(0,'utf8'));
+const controls={year:{},'bookkeeping-data':{textContent:JSON.stringify({rows:[]})}};
+const context={document:{getElementById:id=>controls[id]}};vm.createContext(context);
+vm.runInContext(input.script,context);
+const policy={documents:4,unknown:1,groups:[{earliest_review:'2023-01-01',documents:2},{earliest_review:'2024-01-01',documents:1}]};
+context.policy=policy;
+const counts=day=>JSON.parse(JSON.stringify(vm.runInContext(`retentionCounts(policy,'${day}')`,context)));
+assert.deepStrictEqual(counts('2022-12-31'),{review:0,retained:3,unknown:1});
+assert.deepStrictEqual(counts('2023-01-01'),{review:2,retained:1,unknown:1});
+assert.deepStrictEqual(counts('2024-01-01'),{review:3,retained:0,unknown:1});
+assert.strictEqual(vm.runInContext("retentionToday(new Date('2022-12-31T23:30:00Z'))",context),'2023-01-01');
+assert.strictEqual(vm.runInContext("retentionToday(new Date('2022-12-31T22:30:00Z'))",context),'2022-12-31');
+assert.strictEqual(vm.runInContext("retentionToday(new Date('2023-06-30T22:30:00Z'))",context),'2023-07-01');
+"""
+    subprocess.run([node,'-e',program],input=json.dumps({'script':script}).encode(),
+                   capture_output=True,check=True,timeout=15)
+
+
+def test_full_dashboard_initializes_and_recalculates_retention_without_cli():
+    import re
+    node=shutil.which('node')
+    if not node:pytest.skip('Node is needed to execute the dashboard JavaScript')
+    template=(ROOT/'scripts/dashboard_view.html').read_text(encoding='utf8')
+    script=template.split('<script>')[1].split('</script>')[0]
+    program=r"""
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const input=JSON.parse(fs.readFileSync(0,'utf8')),controls={};
+for(const id of input.ids)controls[id]={value:['kind','category','quality'].includes(id)?'all':'',events:{},addEventListener(type,fn){this.events[type]=fn;}};
+controls['bookkeeping-data'].textContent=JSON.stringify({rows:[],gaps:[],source_sha256:'0'.repeat(64),retention:{documents:4,unknown:1,groups:[{earliest_review:'2023-01-01',documents:2},{earliest_review:'2024-01-01',documents:1}]}});
+const context={document:{getElementById:id=>controls[id]}};vm.createContext(context);
+vm.runInContext(input.script,context);
+assert.strictEqual(controls['retention-asof'].value,vm.runInContext('retentionToday()',context));
+controls['retention-asof'].value='2022-12-31';controls['retention-asof'].events.change();
+assert(controls['retention-status'].textContent.includes('3 weiter aufbewahren · 0 zur manuellen Fristprüfung · 1 mit ungeklärter Fristgrundlage'));
+controls['retention-asof'].value='2023-01-01';controls['retention-asof'].events.change();
+assert(controls['retention-status'].textContent.includes('1 weiter aufbewahren · 2 zur manuellen Fristprüfung · 1 mit ungeklärter Fristgrundlage'));
+assert(controls['retention-rows'].innerHTML.includes('Manuell prüfen'));
+assert(controls['retention-rows'].innerHTML.includes('Fristgrundlage klären'));
+const before=controls['retention-status'].textContent;
+controls.kind.value='invoice';controls.kind.events.change();
+assert.strictEqual(controls['retention-status'].textContent,before);
+controls['retention-asof'].value='';controls['retention-asof'].events.change();
+assert.strictEqual(controls['retention-rows'].innerHTML,'');
+controls['retention-today'].onclick();
+assert.strictEqual(controls['retention-asof'].value,vm.runInContext('retentionToday()',context));
+"""
+    result=subprocess.run([node,'-e',program],input=json.dumps({'script':script,'ids':re.findall(r'id="([^"]+)"',template)}).encode(),
+                          capture_output=True,timeout=15)
+    assert result.returncode==0,result.stderr.decode('utf8',errors='replace')

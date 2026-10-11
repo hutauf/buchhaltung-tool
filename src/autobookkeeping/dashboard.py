@@ -5,6 +5,7 @@ import hashlib
 import json
 import re
 import subprocess
+from collections import Counter
 from datetime import date
 from pathlib import Path
 
@@ -30,6 +31,17 @@ def public_day(value):
         return date.fromisoformat(str(value)[:10]).isoformat()
     except ValueError:
         return None
+
+
+def public_retention(catalog):
+    from autobookkeeping.retention import report
+    # Compute horizons from the full catalog, including histories and references.
+    # The browser compares these dates with its current day; never publish paths.
+    checked = report(catalog, '0001-01-01')
+    groups = Counter(row['earliest_review'] for row in checked['documents'])
+    return {'retention_years': checked['retention_years'], 'documents': len(checked['documents']),
+            'unknown': groups.pop(None, 0),
+            'groups': [{'earliest_review': day, 'documents': count} for day, count in sorted(groups.items())]}
 
 
 def projection(catalog: dict, source_digest: str) -> dict:
@@ -95,6 +107,7 @@ def projection(catalog: dict, source_digest: str) -> dict:
     rows.sort(key=lambda r:(r["date"] or "",r["ref"]))
     return {"schema_version":1,"source_sha256":source_digest,"timezone":"Europe/Berlin","currency":"EUR",
             "backups":backup_status(catalog), "reconciliation":reconcile_status(catalog),
+            "retention":public_retention(catalog),
             "basis":"Erfasste Zahlungsbewegungen; Belegbeträge getrennt. Arbeitsübersicht, keine vollständige steuerliche EÜR.",
             "gaps":["Erfasste Verkäufe mit eBay-API abgleichen; tatsächliche Zahlungsverfügbarkeit gesondert prüfen. Kein automatischer Gebührenimport.",
                     "Warenzugänge/Vine, Privatentnahmen und weitere Betriebseinnahmen/-ausgaben ergänzen",

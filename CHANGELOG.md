@@ -2,6 +2,8 @@
 
 ## Unveröffentlicht
 
+- Offline-Dashboard prüft Aufbewahrungsfristen direkt in JavaScript zum aktuellen Tag in Europe/Berlin oder einem gewählten Stichtag. Anonymisierte Fristgruppen berücksichtigen den gesamten Archivbestand einschließlich späterer Zahlungen und Korrekturen; die CLI bleibt optional.
+
 - Dashboard-Filter „Storno / Teilerstattung“ berücksichtigt auch stornierte und teilweise geminderte Originalrechnungen, einschließlich importierter Storno-Status.
 
 - Große Datenveröffentlichungen übergeben Git-Dateipfade über Standardeingabe; dadurch bleibt der Git-Befehl unter der Windows-Befehlslängengrenze. Nur die ausgewählten Dateien werden aufgenommen.
