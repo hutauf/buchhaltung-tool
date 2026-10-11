@@ -45,6 +45,49 @@ Der Export registriert nur einen vorbereiteten Snapshot. Das Medium erst nach ta
 
 Das Offline-Dashboard zeigt den letzten API-Abgleich, monatlichen Sicherungsbedarf, Registerstände und Bitcoin-Nachweisstatus. Es zeigt passende Befehle; API-/Medienaktionen führt es nicht aus. `veroeffentlichen confirm` erhält erfolgreiche Bitcoin-Prüfungen in einem an genaue Datei-Hashes gebundenen privaten Cache und aktualisiert das Dashboard. Öffentliche Verfahrensbeschreibung und private Betriebsangaben werden bei jeder Funktionsänderung mitgepflegt. Offene betriebliche Zuständigkeiten bleiben offen.
 
+## Dashboard bedienen
+
+`daten/dashboard.html` lässt sich direkt per Doppelklick öffnen. Die drei
+Arbeitsbereiche **Übersicht**, **Belege** und **Kontrollen & Änderungen** bleiben
+vollständig offline. Die Übersicht zeigt erfasste Zahlungen, Monats-/Jahresverlauf,
+kumulierten Zahlungsüberschuss, Ausgabenkategorien und die Zusammensetzung des
+Belegbestands. Eine Grafik, Kategorie oder Prüfzahl anklicken, um die Auswahl
+einzugrenzen und die zugehörigen Belege zu finden. Die exakten Verlaufswerte sind
+unter der Grafik aufklappbar.
+
+Jahr, Monat, Belegart und Nummernsuche sind direkt erreichbar. Unter **Filter
+verfeinern** stehen Kategorie, Prüfbedarf, Status, Quelle, Belegdatumsgrenzen und
+Bruttobetragsgrenzen bereit. Beträge können mit Komma oder Punkt, ohne
+Tausendertrennzeichen eingegeben werden. Aktive Filter erscheinen als einzeln
+entfernbare Chips. **Filter zurücksetzen** stellt das jüngste vorhandene Jahr
+wieder her. Die Schnellansichten im Belegbereich behalten Jahr/Monat und setzen
+die übrigen Filter zurück, damit Stornos, fehlende Originale und Entwürfe leicht
+auffindbar sind.
+
+Die Belegliste lässt sich nach Datum, Nummer und Bruttobetrag in beide Richtungen
+sortieren, auch über die Spaltenüberschriften. Unbekannte Beträge erscheinen als
+Strich und werden immer zuletzt sortiert; Betragsgrenzen schließen sie aus.
+25, 50 oder 100 Zeilen je Seite sind wählbar. **CSV exportieren** enthält alle
+gefilterten Belege in derselben Sortierung, unabhängig von der aktuellen Seite.
+Die Zeilendetails enthalten Zahlungen, Prüfhinweise und kopierbare CLI-Aktionen.
+Falls der Browser auf `file://` den Clipboard-Zugriff sperrt, markiert der
+Kopierknopf den Befehl zum Kopieren mit Strg+C.
+
+Jahr/Monat begrenzen die Zahlungskennzahlen nach Zahlungsdatum. Eine Rechnung
+aus dem Vorjahr bleibt bei einer Zahlung im gewählten Zeitraum sichtbar.
+Belegdatums- und Betragsgrenzen grenzen dagegen den Belegbestand ein, dessen
+Zahlungen ausgewertet werden. Belegsaldo und Geldbewegungen sind getrennt.
+Homeoffice und dessen CSV berücksichtigen immer das gesamte gewählte Jahr,
+unabhängig von Monats- und weiteren Belegfiltern. Die kumulierte Linie zeigt
+ausgewählte Geldbewegungen, keinen Bankkontostand. Keine der Ansichten ist eine
+abgabefertige EÜR oder eine Vollständigkeitsbestätigung.
+
+Unter **Kontrollen & Änderungen** stehen Belegimport, Homeoffice-Vorschau und
+Speicherbefehl, API-Abgleich, Sicherungsregister, Bitcoin-Status und
+Aufbewahrungsfristen. Archivkontrollen berücksichtigen den gesamten Snapshot.
+Filter und Vorschauen speichern keine Buchungen oder Prüfprotokolle. Neue
+Archivdaten werden erst nach erneuter Dashboard-Erzeugung angezeigt.
+
 ## Technische Protokolle und Prüfexport
 
 Katalogänderungen werden automatisch in einem verschlüsselten, verketteten Änderungsprotokoll gespeichert. Vorherige Werte, Änderungszeitpunkt und Toolrevision bleiben prüfbar. Vorhandene Originaldateien und ihre Inventar-Prüfsummen dürfen die Helfer nicht überschreiben oder entfernen. Die Veröffentlichung speichert außerdem die tatsächlich bestandene technische Archivprüfung. Das belegt keinen vollständigen Quellenabgleich.

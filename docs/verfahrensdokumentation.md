@@ -134,6 +134,25 @@ CSV verwendet UTF-8, Semikolon, vollständig eingeschlossene Felder, doppelte An
 
 ### Kontrollen und Verantwortlichkeit
 
+Das statische Dashboard trennt Übersicht, Belegverzeichnis und Kontrollen/Änderungen.
+Es verarbeitet ausschließlich die bereits erlaubten anonymisierten Snapshotfelder
+im Browser, ohne Netzabruf, Personen-/Produktdaten oder Originalpfade.
+Jahres-/Monatsfilter begrenzen Geldbewegungen nach Zahlungsdatum; zugehörige Belege
+werden auch bei abweichendem Belegjahr einbezogen. Weitere Filter grenzen den
+Belegbestand ein. Belegdatums- und Bruttobetragsgrenzen beziehen sich ausdrücklich
+auf Belege, nicht auf Zahlungsdaten/-beträge. Verlauf, Ausgabenkategorien,
+Zahlungskennzahlen und Beleg-CSV verwenden dieselbe Auswahl; die CSV umfasst alle
+Seiten in der angezeigten Sortierung. Unbekannte Beträge bleiben unbekannt und
+werden zuletzt sortiert. Stornierte Originale behalten ihre Belegart und Nummer;
+eine Minderung wird nicht als tatsächlich erfolgte Rückzahlung ausgelegt.
+Die kumulierte Zahlungslinie ist kein Bankkontostand. Die Jahresauswertung samt
+Homeoffice berücksichtigt das ganze gewählte Jahr unabhängig von den übrigen
+Filtern; Archivkontrollen den vollständigen Snapshot. Filter, Grafikklicks,
+Kopierknöpfe und Vorschauen sind reine Anzeigeaktionen. Sie erzeugen keine Buchung,
+Freigabe, Kontrolle im Archiv oder neuen Bitcoin-Nachweis. Tatsächliche Änderungen
+erfolgen weiterhin mit geprüften CLI-Befehlen und deren Veröffentlichungsprozess.
+Neue Daten erfordern die erneute Erzeugung des Dashboards.
+
 Der betriebliche Verantwortliche legt Quellen, Berechtigte, Eingangskontrolle, Erfassungsfristen und Vertretung in der privaten Ergänzung fest. Der Agent bereitet vor; er darf eine allgemeine Wartungsanweisung nicht als konkrete Rechnungs-/Ausgabenfreigabe behandeln. Der tägliche Verkaufsabgleich wird über den ausdrücklich eingerichteten Scheduler aufgerufen. Eingereichte Kostenbelege werden einzeln geprüft; kein automatischer Gebührenimport. Originalrechnungen und tatsächlich verfügbare Zahlungen sind anhand der jeweiligen Quellen zu prüfen. Fehlende Originale und unverarbeitete Vorgänge dokumentieren. Integritätsprüfung allein stellt keine Vollständigkeit fest.
 
 Bei jedem Abschluss Prüfbasis und Freigabe festhalten, Pipelineergebnis lesen und Fehler beheben. Periodisch Vollständigkeit und Summen mit den außerhalb dieses Tools geführten übrigen Geschäftsvorfällen abgleichen. Die genaue Verantwortlichkeit, Häufigkeit, Ausnahmen und tatsächlichen Ergebnisse gehören in die private Betriebsdokumentation. Diese Anforderungen sind noch keine Bestätigung ihrer Durchführung.

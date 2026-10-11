@@ -211,3 +211,116 @@ assert.strictEqual(controls['retention-asof'].value,vm.runInContext('retentionTo
     result=subprocess.run([node,'-e',program],input=json.dumps({'script':script,'ids':re.findall(r'id="([^"]+)"',template)}).encode(),
                           capture_output=True,timeout=15)
     assert result.returncode==0,result.stderr.decode('utf8',errors='replace')
+
+
+def dashboard_runtime(assertions, rows):
+    """Exercise the actual embedded script, including filters, charts and exports."""
+    import re
+    node=shutil.which('node')
+    if not node:pytest.skip('Node is needed to execute the dashboard JavaScript')
+    template=(ROOT/'scripts/dashboard_view.html').read_text(encoding='utf8')
+    program=r"""
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const input=JSON.parse(fs.readFileSync(0,'utf8')),controls={},exports=[];
+for(const id of input.ids)controls[id]={value:['kind','category','quality','month','source-filter','status-filter'].includes(id)?'all':id==='sort'?'date_desc':id==='page-size'?'25':'',events:{},attrs:{},addEventListener(type,fn){this.events[type]=fn;},setAttribute(key,value){this.attrs[key]=value;},focus(){this.focused=true;}};
+controls['bookkeeping-data'].textContent=JSON.stringify({rows:input.rows,gaps:[],source_sha256:'0'.repeat(64),homeoffice:[{year:2012,days:1,amount_cents:600}],retention:{documents:0,unknown:0,groups:[]}});
+const context={controls,exports,assert,document:{getElementById:id=>controls[id],body:{addEventListener(){}},createElement(){return {click(){exports.at(-1).filename=this.download;}};}},Blob:class{constructor(parts){this.text=parts.join('');}},URL:{createObjectURL(blob){exports.push({csv:blob.text});return 'blob:synthetic';},revokeObjectURL(){}},setTimeout(fn){fn();}};
+vm.createContext(context);vm.runInContext(input.script,context);vm.runInContext(input.assertions,context);
+"""
+    result=subprocess.run([node,'-e',program],input=json.dumps({'script':template.split('<script>')[1].split('</script>')[0],
+        'ids':re.findall(r'id="([^"]+)"',template),'rows':rows,'assertions':assertions}).encode(),capture_output=True,timeout=15)
+    assert result.returncode==0,result.stderr.decode('utf8',errors='replace')
+
+
+@pytest.fixture
+def experience_rows():
+    def public(number,kind,date,gross,flows,**extra):
+        return dict(ref='synthetic-'+number,date=date,kind=kind,number=number,proposed_number=None,
+            document_type=kind,related_number=None,status='paid' if kind=='invoice' else 'recorded',
+            gross_cents=gross,net_cents=gross,vat_cents=0,vat_rates=[0],tax_treatment='small_business_exempt',
+            expense_category='postage' if kind.startswith('expense') else None,coverage='complete',source='imported',
+            flows=[dict(ref=number,date=day,amount_cents=amount,bucket=bucket,origin='imported') for day,amount,bucket in flows],
+            warnings=[],document_effect_cents=gross,**extra)
+    rows=[public('0001','invoice','2011-12-28',11900,[('2012-01-03',11900,'income')]),
+          public('0002','invoice','2012-01-02',20000,[('2012-01-04',20000,'income')]),
+          public('0003','invoice','2012-01-05',11900,[('2012-02-01',-11900,'income')]),
+          public('0004','expense','2012-01-02',5000,[('2012-01-10',-5000,'expense')]),
+          public('0005','expense_credit','2012-02-01',-1000,[('2012-02-03',1000,'expense')]),
+          public('0006','expense',None,None,[])]
+    rows[1].update(coverage='missing',warnings=['Synthetic verification warning'])
+    rows[2].update(status='cancelled',document_effect_cents=0)
+    rows[4].update(source='local',document_type='supplier_credit',related_number='0004')
+    rows[5].update(coverage='missing',expense_category=None)
+    return rows
+
+
+def test_experience_payment_periods_reconcile_and_annual_allowance_stays_separate(experience_rows):
+    dashboard_runtime(r"""
+controls.year.value='2012';controls.month.value='01';render();
+assert.deepStrictEqual(Array.from(filtered.map(r=>r.number)).sort(),['0001','0002','0003','0004']);
+assert.strictEqual(visibleFlows.reduce((n,f)=>n+f.amount_cents,0),26900);
+assert.strictEqual(controls.income.textContent,money(31900));
+assert.strictEqual(controls.expenses.textContent,money(5000));
+assert.strictEqual(controls.profit.textContent,money(26900));
+assert.strictEqual(annualEur().surplus,15400); // full year 20000 income - 4000 expenses - 600 noncash allowance
+assert.strictEqual(periodValues(visibleFlows).reduce((n,v)=>n+v.income-v.expense,0),26900);
+assert.strictEqual(expenseGroups(filtered).reduce((n,g)=>n+g[1],0),5000);
+controls.month.value='02';render();
+assert.strictEqual(controls.income.textContent,money(-11900));
+assert.strictEqual(controls.expenses.textContent,money(-1000));
+assert.strictEqual(controls.profit.textContent,money(-10900));
+assert.strictEqual(annualEur().surplus,15400);
+assert(controls['category-chart'].innerHTML.includes('background:#a04336'));
+assert(controls['cumulative-chart'].innerHTML.includes(money(-10900)));
+""",experience_rows)
+
+
+def test_experience_numeric_sort_unknown_amounts_and_invalid_filters(experience_rows):
+    dashboard_runtime(r"""
+clearSelection();controls.sort.value='amount_asc';render();
+assert.deepStrictEqual(Array.from(filtered.map(r=>r.number)),['0005','0004','0001','0003','0002','0006']);
+assert(controls.rows.innerHTML.includes('—'));
+controls.sort.value='amount_desc';render();assert.strictEqual(filtered.at(-1).number,'0006');
+controls['amount-min'].value='-10,00';controls['amount-max'].value='50.00';render();
+assert.deepStrictEqual(Array.from(filtered.map(r=>r.number)).sort(),['0004','0005']);
+controls['amount-min'].value='50,001';render();assert.strictEqual(filtered.length,0);
+assert(controls.scope.textContent.includes('Nachkommastellen'));
+controls['amount-min'].value='51';render();assert(filterError().includes('Mindestbetrag'));
+controls['amount-min'].value='';controls['amount-max'].value='';controls['date-from'].value='2012-02-01';controls['date-to'].value='2012-01-01';render();assert(filterError().includes('Startdatum'));
+clearSelection();controls.quality.value='unknown';render();assert.strictEqual(filtered[0].number,'0006');
+assert.strictEqual(parseAmount('900719925474100'),NaN);
+""",experience_rows)
+
+
+def test_experience_drilldowns_navigation_and_sorted_export_use_same_selection(experience_rows):
+    dashboard_runtime(r"""
+controls.year.value='2012';controls.month.value='all';render();
+controls['quick-cancel'].onclick();assert.strictEqual(filtered.length,1);assert.strictEqual(filtered[0].number,'0003');
+assert.strictEqual(controls['view-records'].hidden,false);assert.strictEqual(controls['nav-records'].attrs['aria-selected'],'true');
+controls['records-all'].onclick();
+controls['category-chart'].onclick({target:{closest:()=>({dataset:{category:'postage'}})}});
+assert.deepStrictEqual(Array.from(filtered.map(r=>r.number)).sort(),['0004','0005']);
+controls['sort-amount'].onclick();assert.strictEqual(filtered[0].number,'0004');
+controls.csv.onclick();assert.strictEqual(exports.length,1);
+assert(exports[0].csv.indexOf('"0004"')<exports[0].csv.indexOf('"0005"'));
+assert(!exports[0].csv.includes('"0001"'));assert(exports[0].csv.includes('"-10,00"'));
+controls['eur-csv'].onclick();
+// The source income is 200 EUR: 119+200-119, annual surplus 154 EUR.
+assert(exports[1].csv.includes('"2012";"200,00";"40,00";"6,00";"46,00";"154,00"'));
+controls['filter-chips'].onclick({target:{closest:()=>({dataset:{clear:'category'}})}});assert.strictEqual(controls.category.value,'all');
+controls.chart.onclick({type:'click',target:{closest:()=>({dataset:{period:'02'}})}});assert.strictEqual(controls.month.value,'02');
+controls['header-to-controls'].onclick();assert.strictEqual(controls['view-controls'].hidden,false);assert.strictEqual(controls['new-entry-panel'].open,true);
+controls.reset.onclick();assert.strictEqual(controls.month.value,'all');assert.strictEqual(controls.category.value,'all');
+""",experience_rows)
+
+
+def test_experience_csv_exports_all_pages_and_snapshot_is_unchanged(experience_rows):
+    rows=[dict(experience_rows[0],ref=f'synthetic-{i}',number=f'{i:04}') for i in range(57)]
+    dashboard_runtime(r"""
+const before=JSON.stringify(DATA);controls.year.value='all';controls.sort.value='number_asc';render();
+assert(controls['page-info'].textContent.startsWith('1–25'));
+controls.next.onclick();assert(controls['page-info'].textContent.startsWith('26–50'));
+controls.csv.onclick();assert.strictEqual(exports[0].csv.split('\r\n').length,58);
+controls['page-size'].value='100';controls['page-size'].events.change();assert(controls['page-info'].textContent.startsWith('1–57'));
+assert.strictEqual(JSON.stringify(DATA),before);
+""",rows)
