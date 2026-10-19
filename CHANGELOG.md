@@ -3,7 +3,7 @@
 ## Unveröffentlicht
 
 - Dashboard mit drei Arbeitsbereichen, klickbaren Monats-/Jahresgrafiken,
-  Ausgabenkategorien, kumuliertem Zahlungsüberschuss und Bestandszusammenfassung.
+  Ausgabenkategorien, kumuliertem Einnahmenüberschuss und Bestandszusammenfassung.
   Erweiterte Filter, entfernbare Filterchips, Schnellansichten für Prüfbedarf und
   Stornos, sortierbare Belegspalten, variable Seitengröße und Kopierknöpfe für
   Belegaktionen; weiterhin eine einzelne vollständig offline nutzbare HTML-Datei.

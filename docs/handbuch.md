@@ -50,7 +50,7 @@ Das Offline-Dashboard zeigt den letzten API-Abgleich, monatlichen Sicherungsbeda
 `daten/dashboard.html` lässt sich direkt per Doppelklick öffnen. Die drei
 Arbeitsbereiche **Übersicht**, **Belege** und **Kontrollen & Änderungen** bleiben
 vollständig offline. Die Übersicht zeigt erfasste Zahlungen, Monats-/Jahresverlauf,
-kumulierten Zahlungsüberschuss, Ausgabenkategorien und die Zusammensetzung des
+kumulierten Einnahmenüberschuss, Ausgabenkategorien und die Zusammensetzung des
 Belegbestands. Eine Grafik, Kategorie oder Prüfzahl anklicken, um die Auswahl
 einzugrenzen und die zugehörigen Belege zu finden. Die exakten Verlaufswerte sind
 unter der Grafik aufklappbar.

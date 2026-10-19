@@ -145,6 +145,9 @@ Zahlungskennzahlen und Beleg-CSV verwenden dieselbe Auswahl; die CSV umfasst all
 Seiten in der angezeigten Sortierung. Unbekannte Beträge bleiben unbekannt und
 werden zuletzt sortiert. Stornierte Originale behalten ihre Belegart und Nummer;
 eine Minderung wird nicht als tatsächlich erfolgte Rückzahlung ausgelegt.
+Die Dashboard-Bezeichnung „Einnahmenüberschuss“ meint die Differenz der erfassten
+Ein- und Auszahlungen; sie ist keine vollständige steuerliche EÜR. Die separat
+ausgewiesene Homeoffice-Pauschale ist darin nicht enthalten.
 Die kumulierte Zahlungslinie ist kein Bankkontostand. Die Jahresauswertung samt
 Homeoffice berücksichtigt das ganze gewählte Jahr unabhängig von den übrigen
 Filtern; Archivkontrollen den vollständigen Snapshot. Filter, Grafikklicks,
