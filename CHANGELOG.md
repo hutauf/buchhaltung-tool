@@ -2,6 +2,11 @@
 
 ## Unveröffentlicht
 
+- Verfahrensbeschreibung erläutert die kryptografische Absicherung bestätigter
+  Archivstände auch gegenüber Administratoren: Git-/Dateiprüfsummen, zeitnahe
+  OTS-Einreichung, externer Bitcoin-Anker und überprüfbare Fortschreibung.
+  Erreichte Schutzwirkung und betriebliche Voraussetzungen sind getrennt beschrieben.
+
 - Eigener Dashboard-Reiter „Verfahrensdoku“ mit vollständig eingebetteter
   allgemeiner Beschreibung, Inhaltsverzeichnis und Quellenprüfsumme. Die private
   betriebliche Ergänzung bleibt separat verlinkt; Dokumentation ist Bestandteil

@@ -57,7 +57,7 @@ Die [GoBD-Verfahrensdokumentation](docs/verfahrensdokumentation.md) erklärt die
 | Anforderung | Umsetzung und Einschränkung |
 |---|---|
 | Nachvollziehbarkeit und Ordnung | Originale, Metadaten und Korrekturen bleiben verknüpft; Änderungen werden protokolliert. |
-| Unveränderbarkeit | Originale werden nicht überschrieben; Git-Historie und bestätigte Bitcoin-Zeitnachweise machen Änderungen prüfbar. Administratoren können Daten trotzdem löschen; unabhängige Sicherungen bleiben erforderlich. |
+| Unveränderbarkeit | Originale bleiben erhalten. Git und bestätigte Bitcoin-Zeitnachweise sichern historische Stände gegen unbemerkte rückwirkende Ersetzung ab – auch bei lokalen Administratorrechten. Ein neuer Nachweis ersetzt keinen alten Zeitpunkt; unabhängige Sicherungen erhalten Daten und Beweise. |
 | Vollständigkeit, Richtigkeit, zeitgerechte Erfassung | Quellen-, Betrags- und Dublettenprüfungen helfen. Vollständigen Eingang, tatsächliche Zahlungen und rechtzeitige Erfassung musst du sicherstellen. |
 | Aufbewahrung und Datensicherheit | Verschlüsselte Originale, elfjährige Archivpolitik, keine automatische Löschung. Passwortsicherung, Zugriffsrechte und geprüfte Sicherungsmedien liegen bei dir. |
 | Lesbarkeit und Datenzugriff | Originale und Metadaten lassen sich vollständig exportieren. Benötigte Prüferauswertungen sind gesondert abzustimmen. |
