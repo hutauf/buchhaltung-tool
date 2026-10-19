@@ -37,4 +37,7 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try: raise SystemExit(main())
+    except Exception as exc:
+        from autobookkeeping.diagnostics import failure
+        print_json(failure(exc));raise SystemExit(1)

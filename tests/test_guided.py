@@ -39,6 +39,9 @@ def test_safe_errors_have_next_steps_without_secret_exception_text(tmp_path):
     result=failure(InvalidTag(secret),tmp_path)
     assert 'passwort pruefen' in result['hint'] and result['publication_pending']
     assert 'resume' in result['next'] and secret not in json.dumps(result)
+    import imaplib
+    result=failure(imaplib.IMAP4.error(secret))
+    assert 'GMX' in result['hint'] and secret not in json.dumps(result)
 
 
 def test_password_memory_check_uses_real_wrapper_not_env_equality(tmp_path,monkeypatch,capsys):

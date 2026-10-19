@@ -7,6 +7,7 @@ from pathlib import Path
 def failure(exc, repo: Path | None = None) -> dict:
     from cryptography.exceptions import InvalidTag
     from autobookkeeping.local_invoices import WorkflowError
+    import imaplib
     import httpx
     from filelock import Timeout
     error, hint = "Vorgang konnte nicht abgeschlossen werden.", "Eingaben prüfen und den Vorgang erneut prüfen, bevor du ihn wiederholst."
@@ -28,6 +29,8 @@ def failure(exc, repo: Path | None = None) -> dict:
         hint = "Zugangsdaten und Berechtigungen der ausgewählten Anbindung prüfen." if status in (401,403) else "Verfügbarkeit der Anbindung prüfen; später erneut versuchen."
     elif isinstance(exc, httpx.RequestError):
         error, hint = "Die Verbindung zum angebundenen Dienst ist fehlgeschlagen.", "Internetverbindung und konfigurierte Anbindung prüfen; später erneut versuchen."
+    elif isinstance(exc, imaplib.IMAP4.error):
+        error, hint = 'Der Postfachzugriff ist fehlgeschlagen.', 'GMX-IMAP-Zugang und gegebenenfalls das App-Passwort prüfen; die Mailprüfung anschließend erneut starten.'
     elif isinstance(exc, ValueError):
         error, hint = 'Eingabe oder Dateiformat ist ungültig.', 'Datum, Zahlen und Pflichtfelder im geführten Dialog prüfen; bei vorhandenen Archivdateien auch die Integrität mit buchhaltung pruefen testen.'
     elif isinstance(exc, (EOFError, KeyboardInterrupt)):

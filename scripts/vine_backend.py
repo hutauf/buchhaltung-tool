@@ -257,4 +257,8 @@ def _public_record(record) -> dict:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try: raise SystemExit(main())
+    except Exception as exc:
+        from autobookkeeping.diagnostics import failure
+        import json
+        print(json.dumps(failure(exc),ensure_ascii=False));raise SystemExit(1)
