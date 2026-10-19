@@ -305,7 +305,7 @@ class LocalInvoices:
             raise WorkflowError('DHL-Leseprüfung und konfigurierte Vine-Prüfung vor dem Entwurf erforderlich')
         return self._prepare(order_snapshot(order), checks, attachment, rates, replacement_of)
 
-    def prepare_manual(self, payload: dict, rates=None) -> dict:
+    def prepare_manual(self, payload: dict, rates=None, replacement_of=None) -> dict:
         from datetime import date as calendar_day
         buyer = payload.get('buyer', {})
         if buyer.get('country_iso') != 'DE' or not all(isinstance(buyer.get(k),str) and buyer[k].strip() for k in ('name','street','postal_code','city')):
@@ -326,7 +326,7 @@ class LocalInvoices:
         snapshot=dict(order_id='manual:'+sha(reference.strip().encode()),sales_record_number=None,order_id_aliases=[],order_status='manual',
                       paid_at=None,delivery_date=delivery,tracking_number=None,buyer=dict(buyer),positions=positions,currency='EUR',
                       gross=amount(sum((Decimal(p['gross']) for p in positions),Decimal(0))),entry_source='manual',manual_reference=reference.strip())
-        return self._prepare(snapshot,{'entry_source':'manual','verification_basis':basis.strip(),'vine_status':'not_applicable','dhl_status':'not_applicable'},None,rates,None)
+        return self._prepare(snapshot,{'entry_source':'manual','verification_basis':basis.strip(),'vine_status':'not_applicable','dhl_status':'not_applicable'},None,rates,replacement_of)
 
     def _prepare(self, snapshot, checks, attachment, rates, replacement_of):
         self.archive.verify()

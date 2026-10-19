@@ -126,6 +126,15 @@ def test_manual_invoice_without_services_has_no_invented_payment(workspace):
     assert archive.verify()['ok']
     with pytest.raises(WorkflowError,match='bereits'):
         workflow.prepare_manual(payload)
+    from autobookkeeping.adjustments import Adjustments
+    adjustments=Adjustments(workflow)
+    cancel=adjustments.prepare(issued['id'],'cancellation',{'reason':'Synthetic correction test'})
+    adjustments.issue(cancel['id'],cancel['revision'],'0902',True)
+    replacement=workflow.prepare_manual(payload,replacement_of=issued['id'])
+    assert replacement['proposed_number']=='0903'
+    corrected=workflow.issue(replacement['id'],replacement['revision'],'0903',None,True)
+    assert archive.catalog()['records'][corrected['id']]['current']['replacement_of']==issued['id']
+    assert document_flows(archive.catalog(),archive.catalog()['records'][corrected['id']]['current'])[0]==[]
 
 
 def test_unconfigured_vine_is_optional_but_failed_checks_are_not_ignored(workspace):

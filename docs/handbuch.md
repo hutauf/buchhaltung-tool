@@ -250,3 +250,5 @@ Ohne Windows-Unterstützung langer Pfade einen kurzen Testpfad wie `C:\bk1` verw
 - `buchhaltung passwort einrichten` für neue Archive; `buchhaltung passwort pruefen` testet die verdeckte Eingabe am Datenschlüssel. [Passwort und Datenrettung](einrichtung.md#archivpasswort-und-wiederherstellung).
 
 Die freiwillige Dashboard-Passworterinnerung ist ausdrücklich ungeprüft und überspringbar. Kein Passwort oder Hash wird im HTML gespeichert; nur der Erinnerungszeitpunkt kann lokal für 24 Stunden hinterlegt werden. Sicherungsmedien und Restoretests sind Empfehlungen mit sichtbarem Status, keine Buchungssperren. Eine CD ist nicht Voraussetzung des Tools. Historische Bitcoin-Zählwerte sind kein Live-Publikationsstatus. Bei einem CLI-Abbruch zuerst `buchhaltung veroeffentlichen status`, anschließend `resume`; nicht erneut buchen.
+
+Nach vollständigem Storno einer manuellen Rechnung kann mit derselben eigenen Auftragsreferenz und `rechnung manual-prepare --interactive --replacement-of ORIGINAL_ID` ein verknüpfter Ersatzentwurf erstellt werden. Er erhält erst beim gesondert freigegebenen Abschluss die nächste Nummer; auch dadurch entsteht keine zusätzliche Zahlung.

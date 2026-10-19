@@ -2,6 +2,9 @@
 
 ## Unveröffentlicht
 
+- Manuelle Ersatzrechnungen nach vollständigem Storno bleiben explizit mit dem
+  Original verknüpft und erzeugen keinen zusätzlichen Zahlungseingang.
+
 - Geführte Beleg-, Zahlungs-, Korrektur- und Profilerfassung ohne selbst erstellte
   JSON-Dateien; manuelle Rechnungsentwürfe ohne externe Dienste. Vine optional,
   konfigurierte Fehler werden weiterhin gemeldet. Freigaben bleiben getrennt.

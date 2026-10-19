@@ -62,7 +62,7 @@ def main() -> dict:
     p.add_argument("--vat-rates", nargs="+", type=int); p.add_argument("--replacement-of")
     p = sub.add_parser('manual-prepare', help='Manuelle Rechnung ohne eBay/DHL/Vine als unverbindlichen Entwurf erfassen')
     p.add_argument('--interactive', action='store_true'); p.add_argument('--metadata', type=Path)
-    p.add_argument('--vat-rates', nargs='+',type=int)
+    p.add_argument('--vat-rates', nargs='+',type=int); p.add_argument('--replacement-of')
     p = sub.add_parser("adjustment-prepare")
     p.add_argument("invoice_id"); p.add_argument("--kind", choices=("cancellation", "partial_refund", "correction"), required=True)
     p.add_argument("--metadata", type=Path); p.add_argument('--interactive',action='store_true')
@@ -148,7 +148,7 @@ def main() -> dict:
                         attachment = (metadata, outside(ROOT, args.receipt).read_bytes())
                     result = workflow.prepare(order, checks, attachment, args.vat_rates, args.replacement_of)
                 elif args.command == 'manual-prepare':
-                    result=workflow.prepare_manual(payload,args.vat_rates)
+                    result=workflow.prepare_manual(payload,args.vat_rates,args.replacement_of)
                 elif args.command == "adjustment-prepare":
                     result = Adjustments(workflow).prepare(args.invoice_id, args.kind, payload)
                 elif args.command == "adjustment-issue":
