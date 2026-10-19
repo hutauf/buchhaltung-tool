@@ -2,6 +2,9 @@
 
 ## Unveröffentlicht
 
+- Zwei ältere Datenschutz-Testvorlagen an den zusätzlichen Verfahrensplatzhalter
+  angepasst; die strenge Dashboard- und Datenschutzprüfung bleibt erhalten.
+
 - Verfahrensbeschreibung erläutert die kryptografische Absicherung bestätigter
   Archivstände auch gegenüber Administratoren: Git-/Dateiprüfsummen, zeitnahe
   OTS-Einreichung, externer Bitcoin-Anker und überprüfbare Fortschreibung.

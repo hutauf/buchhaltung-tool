@@ -90,7 +90,7 @@ def test_cash_override_replaces_source_and_privacy_allowlist(workspace):
     catalog=archive.catalog(); old=catalog["records"]["imported:invoice:1"]["current"]
     old.update(id="imported:invoice:1",source="imported",date="2011-01-01",status="paid")
     snapshot=projection(catalog,"0"*64)
-    data=html(snapshot,b'<script type="application/json">__BOOKKEEPING_DATA__</script>')
+    data=html(snapshot,b'<script type="application/json">__BOOKKEEPING_DATA__</script><section>__BOOKKEEPING_PROCEDURE__</section>')
     assert sum(f["amount_cents"] for r in snapshot["rows"] if r["number"]=="0901" for f in r["flows"])==1300
     for value in (b"SYNTHETIC BUYER",b"Testunternehmer",b"SYNTHETIC DEMO",b"PRIVATE BANK REFERENCE",b"PRIVATE EVIDENCE",b"test-tracking",b"paid-order"):
         assert value not in data

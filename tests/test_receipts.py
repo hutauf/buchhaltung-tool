@@ -58,7 +58,7 @@ def test_unpaid_generic_receipt_approval_encryption_privacy_and_idempotence(setu
     assert document_flows(archive.catalog(),row)[0]==[]
     assert projection(archive.catalog(),"0"*64)["rows"][0]["expense_category"]=="software_subscriptions"
     assert book(receipts,draft)["changed"] is False
-    html_bytes=html(projection(archive.catalog(),"0"*64),b'__BOOKKEEPING_DATA__')
+    html_bytes=html(projection(archive.catalog(),"0"*64),b'__BOOKKEEPING_DATA__<section>__BOOKKEEPING_PROCEDURE__</section>')
     assert b"PRIVATE" not in html_bytes and b"SYNTHETIC SOFTWARE DESCRIPTION" not in html_bytes
     again=receipts.inspect(source,tmp_path/"already-booked")
     assert again["existing_records"]==[result["record_id"]]
