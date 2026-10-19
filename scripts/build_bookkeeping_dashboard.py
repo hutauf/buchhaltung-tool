@@ -14,10 +14,10 @@ from autobookkeeping.dashboard import html, index_blob, index_catalog, projectio
 
 CODE = ["scripts/build_bookkeeping_dashboard.py", "scripts/dashboard_view.html", "docs/verfahrensdokumentation.md",
         "scripts/bookkeeping_action.py", "scripts/publish_bookkeeping.py", "scripts/homeoffice.py",
-        "scripts/receipt.py", "scripts/local_invoice.py", "scripts/bookkeeping_archive.py",
+        "scripts/receipt.py", "scripts/local_invoice.py", "scripts/bookkeeping_archive.py", "scripts/password.py",
         "scripts/backup_register.py", "scripts/reconcile_ebay.py",
         *["src/autobookkeeping/"+name+".py" for name in
-        ("__init__", "workspace", "repository_privacy", "archive", "audit_trail", "inspection_export", "backups", "reconciliation", "checklist", "handover", "dashboard", "adjustments", "cashflow", "local_invoices", "taxes", "ledger_validation", "receipts", "einvoices", "retention", "homeoffice", "publication", "timestamps", "models")]]
+        ("__init__", "guided", "diagnostics", "workspace", "repository_privacy", "archive", "audit_trail", "inspection_export", "backups", "reconciliation", "checklist", "handover", "dashboard", "adjustments", "cashflow", "local_invoices", "taxes", "ledger_validation", "receipts", "einvoices", "retention", "homeoffice", "publication", "timestamps", "models")]]
 
 
 def git(repo, *args):

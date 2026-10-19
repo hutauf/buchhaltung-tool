@@ -113,10 +113,7 @@ class VineBackendClient:
 
     def _post(self, payload: dict[str, Any]) -> dict[str, Any]:
         response = httpx.post(self.url, json=payload, timeout=60)
-        if response.is_error:
-            raise RuntimeError(
-                f"Vine backend failed: {response.status_code} {response.text[:1000]}"
-            )
+        response.raise_for_status()
         return response.json()
 
 

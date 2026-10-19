@@ -16,7 +16,7 @@ py -m venv .venv
 .venv/Scripts/python.exe -X utf8 scripts/setup_workspace.py --data-url 'https://github.com/DEIN-KONTO/DEIN-DATENREPO.git'
 ```
 
-**2. Passwort hinterlegen:** `daten/.env` anlegen und `ENCRYPTION_PASSWORD='DEIN-STARKES-PASSWORT'` eintragen. Passwort getrennt sichern. Belege gehören ins private Datenrepo; Zugangsdaten bleiben lokal.
+**2. Passwort einrichten:** `.venv/Scripts/buchhaltung.exe passwort einrichten` fragt es verdeckt ab und hinterlegt es lokal in `daten/.env`. Im Passwortmanager und als unabhängige Notfallkopie sichern: **Ohne Passwort können auch Sicherungen nicht entschlüsselt werden.** `.env` bleibt außerhalb von Git. [Passwort und Wiederherstellung](docs/einrichtung.md#archivpasswort-und-wiederherstellung).
 
 **3. Leeres Archiv starten** — Git-Name und E-Mail müssen eingerichtet sein ([Anleitung](docs/einrichtung.md#git-autor)):
 
@@ -38,13 +38,14 @@ In `daten/.env` die eBay-Zugangsdaten und den GMX-Login ergänzen: [Schritt für
 .venv/Scripts/python.exe -X utf8 scripts/find_dhl_receipt.py 'SENDUNGSNUMMER_ODER_SUCHBEGRIFF' --download --output-dir C:/bk/belegpruefung/dhl
 ```
 
-Einrichtung und Abruf buchen noch keine Rechnung oder Ausgabe. Rechnungsentwürfe brauchen derzeit zusätzlich eine [Vine-Anbindung](docs/einrichtung.md#vine). Regelmäßige Abrufe müssen im Scheduler eingerichtet werden.
+Einrichtung und Abruf buchen noch keine Rechnung oder Ausgabe. [Vine ist optional](docs/einrichtung.md#vine). Manuelle Rechnungen funktionieren auch ohne externe Anbindungen. Regelmäßige Abrufe müssen im Scheduler eingerichtet werden.
 
 ## Im Alltag
 
 ```powershell
 .venv/Scripts/buchhaltung.exe --help
-.venv/Scripts/buchhaltung.exe beleg inspect 'PFAD_ZUM_BELEG'
+.venv/Scripts/buchhaltung.exe beleg neu 'PFAD_ZUM_BELEG'
+.venv/Scripts/buchhaltung.exe rechnung manual-prepare --interactive
 .venv/Scripts/buchhaltung.exe dashboard
 ```
 

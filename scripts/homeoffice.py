@@ -57,4 +57,5 @@ if __name__ == "__main__":
     except WorkflowError as exc:
         print(json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False)); sys.exit(1)
     except Exception as exc:
-        print(json.dumps({"ok": False, "error_type": type(exc).__name__, "hint": "publish_bookkeeping.py status und resume verwenden; gespeicherte Buchung nicht wiederholen"})); sys.exit(1)
+        from autobookkeeping.diagnostics import failure
+        print(json.dumps(failure(exc,ROOT),ensure_ascii=False)); sys.exit(1)

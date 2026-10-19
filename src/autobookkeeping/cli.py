@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 ROUTES = {
+    'passwort': ('password.py', [], 'Archivpasswort einrichten und aus dem Gedächtnis prüfen'),
     "rechnung": ("local_invoice.py", [], "Lokale Rechnungen und Korrekturen"),
     "beleg": ("receipt.py", [], "Belege lesen, vormerken und nach Freigabe buchen"),
     "zahlung": ("local_invoice.py", [], "Zahlungsnachweise erfassen oder berichtigen"),

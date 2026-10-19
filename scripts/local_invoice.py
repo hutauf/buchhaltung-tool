@@ -26,11 +26,14 @@ from autobookkeeping.vine_backend import VineBackendClient, candidate_matches, m
 
 def read_checks(order, settings) -> dict:
     checks = {}
-    records = VineBackendClient(settings).get_all()
+    if bool(settings.vine_backend_url) != bool(settings.vine_backend_token):
+        raise WorkflowError('Vine-Anbindung unvollständig: URL und Token gemeinsam konfigurieren oder beide weglassen')
+    records = VineBackendClient(settings).get_all() if settings.vine_backend_url else []
+    checks['vine_status'] = 'checked' if settings.vine_backend_url else 'not_configured'
     checks["vine"] = [{"item_index": index, "inventory": match_recommendation(records, item.title, 3),
                        "all_records_candidates": candidate_matches(records, item.title, item.price)[:3]}
                       for index, item in enumerate(order.items)]
-    checks["vine_checked"] = True
+    checks["vine_checked"] = bool(settings.vine_backend_url)
     # Use the existing IMAP helper; suppress signed receipt links in saved metadata/stdout.
     if order.tracking_number:
         run = subprocess.run([sys.executable, "-X", "utf8", str(TOOL / "scripts/find_dhl_receipt.py"), order.tracking_number],
@@ -51,15 +54,18 @@ def main() -> dict:
     parser = argparse.ArgumentParser(description="Lokale Rechnungen: zunächst unverbindliche Testentwürfe")
     sub = parser.add_subparsers(dest="command", required=True)
     p = sub.add_parser("configure", help="Lokales Absenderprofil und geprüften Nummernstand einrichten")
-    p.add_argument("--profile", type=Path, required=True); p.add_argument("--last-number", required=True)
+    p.add_argument("--profile", type=Path); p.add_argument('--interactive',action='store_true'); p.add_argument("--last-number", required=True)
     sub.add_parser("list")
     sub.add_parser("recover", help="Bereits autorisierte, unterbrochene Transaktion abschließen")
     p = sub.add_parser("prepare"); p.add_argument("order_id")
     p.add_argument("--receipt", type=Path); p.add_argument("--receipt-metadata", type=Path)
     p.add_argument("--vat-rates", nargs="+", type=int); p.add_argument("--replacement-of")
+    p = sub.add_parser('manual-prepare', help='Manuelle Rechnung ohne eBay/DHL/Vine als unverbindlichen Entwurf erfassen')
+    p.add_argument('--interactive', action='store_true'); p.add_argument('--metadata', type=Path)
+    p.add_argument('--vat-rates', nargs='+',type=int)
     p = sub.add_parser("adjustment-prepare")
     p.add_argument("invoice_id"); p.add_argument("--kind", choices=("cancellation", "partial_refund", "correction"), required=True)
-    p.add_argument("--metadata", type=Path, required=True)
+    p.add_argument("--metadata", type=Path); p.add_argument('--interactive',action='store_true')
     p = sub.add_parser("adjustment-issue")
     p.add_argument("id"); p.add_argument("--revision", required=True); p.add_argument("--number", required=True)
     p.add_argument("--approved", action="store_true")
@@ -67,7 +73,8 @@ def main() -> dict:
     p.add_argument("--mode", choices=("small-business", "regular"), required=True)
     p.add_argument("--reason", required=True); p.add_argument("--approved", action="store_true")
     p = sub.add_parser("cash-record")
-    p.add_argument("--metadata", type=Path, required=True); p.add_argument("--approved", action="store_true")
+    p.add_argument("--metadata", type=Path); p.add_argument('--interactive',action='store_true'); p.add_argument('--record-id')
+    p.add_argument("--approved", action="store_true")
     p = sub.add_parser("cash-void")
     p.add_argument("id"); p.add_argument("--reason", required=True); p.add_argument("--approved", action="store_true")
     p = sub.add_parser("preview"); p.add_argument("id"); p.add_argument("--output", required=True, type=Path)
@@ -84,9 +91,28 @@ def main() -> dict:
     args = parser.parse_args()
     ROOT = data_root()
     (ROOT / "output").mkdir(exist_ok=True)
+    payload = None
+    if args.command=='configure':
+        if bool(args.profile)==bool(args.interactive): raise WorkflowError('Entweder --interactive oder --profile angeben')
+        if args.interactive:
+            from autobookkeeping import guided
+            payload=guided.profile()
+    if args.command in ('manual-prepare','adjustment-prepare','cash-record'):
+        if bool(args.metadata) == bool(args.interactive): raise WorkflowError('Entweder --interactive oder --metadata angeben')
+        if args.metadata: payload=json.loads(outside(ROOT,args.metadata).read_bytes())
+        else:
+            from autobookkeeping import guided
+            if args.command=='manual-prepare': payload=guided.manual_invoice()
+            elif args.command=='cash-record':
+                if not args.record_id: raise WorkflowError('Beleg mit --record-id oder Dashboard-Aktion auswählen')
+                payload=guided.payment(args.record_id);args.approved=True
+            else:
+                with FileLock(ROOT/'output/archive.lock',timeout=0):
+                    a=Archive(ROOT);a.verify();catalog=a.catalog()
+                payload=guided.adjustment(catalog,args.invoice_id,args.kind)
     if args.command == "recover" and (ROOT / "output/publication.json").exists():
         return {"ok": True, "publication": resume(ROOT)}
-    with Publication(ROOT, "local invoice " + args.command, enabled=args.command in ['configure', 'prepare', 'adjustment-prepare', 'adjustment-issue', 'tax-profile', 'cash-record', 'cash-void', 'discard', 'activate', 'issue', 'expense', 'recover']) as publication:
+    with Publication(ROOT, "local invoice " + args.command, enabled=args.command in ['configure', 'prepare', 'manual-prepare', 'adjustment-prepare', 'adjustment-issue', 'tax-profile', 'cash-record', 'cash-void', 'discard', 'activate', 'issue', 'expense', 'recover']) as publication:
         with FileLock(ROOT / "output/archive.lock", timeout=0):
             archive = Archive(ROOT); workflow = LocalInvoices(archive)
             if args.command == "recover":
@@ -96,7 +122,7 @@ def main() -> dict:
                     raise WorkflowError("Unterbrochene Transaktion zuerst mit recover abschließen")
                 archive.verify()
                 if args.command == "configure":
-                    profile = outside(ROOT, args.profile).read_bytes()
+                    profile = encoded(payload) if args.interactive else outside(ROOT, args.profile).read_bytes()
                     workflow.configure(json.loads(profile), args.last_number, {"source":"local_profile", "source_sha256":sha(profile)})
                     result = {"ok":True,"mode":"trial","profile_encrypted":True}
                 elif args.command == "list":
@@ -121,15 +147,16 @@ def main() -> dict:
                             raise WorkflowError("Nur einzeln geprüfte DHL-Originale mit 0 % Steuer vormerken")
                         attachment = (metadata, outside(ROOT, args.receipt).read_bytes())
                     result = workflow.prepare(order, checks, attachment, args.vat_rates, args.replacement_of)
+                elif args.command == 'manual-prepare':
+                    result=workflow.prepare_manual(payload,args.vat_rates)
                 elif args.command == "adjustment-prepare":
-                    payload = json.loads(outside(ROOT, args.metadata).read_bytes())
                     result = Adjustments(workflow).prepare(args.invoice_id, args.kind, payload)
                 elif args.command == "adjustment-issue":
                     result = Adjustments(workflow).issue(args.id, args.revision, args.number, args.approved)
                 elif args.command == "tax-profile":
                     result = change_tax_profile(workflow, args.mode == "small-business", args.reason, args.approved)
                 elif args.command == "cash-record":
-                    result = record_cash(workflow, json.loads(outside(ROOT, args.metadata).read_bytes()), args.approved)
+                    result = record_cash(workflow, payload, args.approved)
                 elif args.command == "cash-void":
                     result = void_cash(workflow, args.id, args.reason, args.approved)
                 elif args.command == "preview":
@@ -145,7 +172,7 @@ def main() -> dict:
                     if not args.approved:
                         raise WorkflowError("Ausstellung benötigt ausdrückliche Freigabe")
                     invoice = archive.catalog()["local_invoice_drafts"][args.id]["current"]
-                    order = EbayTradingClient(load_settings()).get_order(invoice["order_id"])
+                    order = None if invoice.get('entry_source')=='manual' else EbayTradingClient(load_settings()).get_order(invoice["order_id"])
                     result = workflow.issue(args.id, args.revision, args.number, order, args.approved)
                 elif args.command == "expense":
                     result = workflow.expense(args.invoice_id, args.receipt_sha256, args.approved)
@@ -161,5 +188,6 @@ if __name__ == "__main__":
         raise SystemExit(1)
     except Exception as exc:
         # HTTP responses may contain secrets or buyer details: never echo them.
-        print(json.dumps({"ok": False, "error_type": type(exc).__name__, "hint": "Quelle, Passwort und Pfade prüfen; bei unterbrochener Veröffentlichung publish_bookkeeping.py status und resume verwenden"}))
+        from autobookkeeping.diagnostics import failure
+        print(json.dumps(failure(exc,TOOL/'daten'),ensure_ascii=False))
         raise SystemExit(1)

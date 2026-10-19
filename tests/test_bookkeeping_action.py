@@ -36,3 +36,12 @@ def test_supplier_credit_import_resolves_original_locally_without_booking():
     row={'id':'PRIVATE IDENTIFIER','kind':'expense'}
     assert MODULE['command'](args,'records',row)==['receipt.py','inspect','SYNTHETIC-CREDIT.pdf','--original-id',row['id']]
     with pytest.raises(WorkflowError):MODULE['command'](args,'local_expense_drafts',row)
+
+
+def test_interactive_correction_and_supplier_credit_do_not_require_json_files():
+    row={'id':'SYNTHETIC-INVOICE','kind':'invoice'}
+    args=SimpleNamespace(action='refund-prepare',metadata=None,interactive=True)
+    command=MODULE['command'](args,'records',row)
+    assert command==['local_invoice.py','adjustment-prepare',row['id'],'--kind','partial_refund','--interactive']
+    args=SimpleNamespace(action='supplier-credit-inspect',file=Path('SYNTHETIC-CREDIT.pdf'),interactive=True)
+    assert MODULE['command'](args,'records',{'id':'SYNTHETIC-EXPENSE','kind':'expense'})[1]=='neu'

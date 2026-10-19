@@ -102,6 +102,76 @@ def test_discard_does_not_consume_number(workspace):
     assert first["id"] != second["id"] and second["proposed_number"] == "0901"
 
 
+def test_manual_invoice_without_services_has_no_invented_payment(workspace):
+    from autobookkeeping.cashflow import document_flows
+    archive,workflow,_,_=workspace
+    payload={'reference':'SYNTHETIC-MANUAL-1','verification_basis':'Synthetic signed order',
+             'buyer':{'name':'SYNTHETIC BUYER','street':'Testweg 4','postal_code':'12345','city':'Teststadt','country':'Deutschland','country_iso':'DE'},
+             'delivery_date':'2011-01-10','positions':[{'title':'SYNTHETIC ITEM','quantity':2,'unit_gross':'7.50'}]}
+    draft=workflow.prepare_manual(payload)
+    assert workflow.prepare_manual(payload)==draft
+    assert draft['gross']=='15.00' and draft['number'] is None
+    workflow.activate('0900','0900',True)
+    issued=workflow.issue(draft['id'],draft['revision'],'0901',None,True)
+    record=archive.catalog()['records'][issued['id']]['current']
+    assert record['entry_source']=='manual' and record['payment_status']=='unpaid' and record['outstanding']=='15.00'
+    assert record['pay_date'] is None and document_flows(archive.catalog(),record)[0]==[]
+    text='\n'.join(p.extract_text() for p in PdfReader(io.BytesIO(archive.read(issued['documents'][0]))).pages)
+    assert 'Auftragsreferenz' in text and 'SYNTHETIC-MANUAL-1' in text and 'Bereits über eBay bezahlt' not in text
+    assert any(n.endswith('.xml.enc') for n in issued['documents'])
+    from lxml import etree as ET
+    xml=ET.fromstring(archive.read(next(n for n in issued['documents'] if n.endswith('.xml.enc'))))
+    assert xml.xpath("string(//*[local-name()='PrepaidAmount'])")=='0.00'
+    assert xml.xpath("string(//*[local-name()='PayableAmount'])")=='15.00'
+    assert archive.verify()['ok']
+    with pytest.raises(WorkflowError,match='bereits'):
+        workflow.prepare_manual(payload)
+
+
+def test_unconfigured_vine_is_optional_but_failed_checks_are_not_ignored(workspace):
+    _,workflow,order,checks=workspace
+    draft=workflow.prepare(order,dict(checks,vine_checked=False,vine_status='not_configured'))
+    assert draft['number'] is None
+    with pytest.raises(WorkflowError): workflow.prepare(order,dict(checks,vine_checked=False,vine_status='failed'))
+    import runpy
+    from pathlib import Path
+    from types import SimpleNamespace
+    module=runpy.run_path(str(Path(__file__).resolve().parents[1]/'scripts/local_invoice.py'))
+    order.tracking_number=None
+    result=module['read_checks'](order,SimpleNamespace(vine_backend_url='',vine_backend_token=''))
+    assert result['vine_status']=='not_configured' and result['vine_checked'] is False
+    with pytest.raises(WorkflowError,match='unvollständig'):
+        module['read_checks'](order,SimpleNamespace(vine_backend_url='https://example.invalid',vine_backend_token=''))
+
+
+def test_manual_cli_uses_no_external_client_for_prepare_or_issue(workspace,monkeypatch):
+    import runpy
+    import sys
+    from pathlib import Path
+    from autobookkeeping import guided
+    archive,workflow,_,_=workspace
+    payload={'reference':'SYNTHETIC-CLI-MANUAL','verification_basis':'Synthetic local sale reviewed',
+             'buyer':{'name':'SYNTHETIC BUYER','street':'Testweg 4','postal_code':'12345','city':'Teststadt','country':'Deutschland','country_iso':'DE'},
+             'delivery_date':'2011-01-10','positions':[{'title':'SYNTHETIC ITEM','quantity':1,'unit_gross':'3.50'}]}
+    module=runpy.run_path(str(Path(__file__).resolve().parents[1]/'scripts/local_invoice.py'))
+    class OfflinePublication:
+        enabled=False
+        def __init__(self,*args,**kwargs):pass
+        def __enter__(self):return self
+        def __exit__(self,*args):pass
+    g=module['main'].__globals__
+    g.update(data_root=lambda:archive.repo,Publication=OfflinePublication,Archive=lambda _:archive)
+    def forbidden():raise AssertionError('Manual flow must not load service settings')
+    g['load_settings']=forbidden
+    monkeypatch.setattr(guided,'manual_invoice',lambda:payload)
+    monkeypatch.setattr(sys,'argv',['local_invoice.py','manual-prepare','--interactive'])
+    draft=module['main']()
+    workflow.activate('0900','0900',True)
+    monkeypatch.setattr(sys,'argv',['local_invoice.py','issue',draft['id'],'--revision',draft['revision'],'--number','0901','--approved'])
+    issued=module['main']()
+    assert issued['number']=='0901' and archive.verify()['ok']
+
+
 def test_finalize_guard_and_immutable_numbered_original(workspace, tmp_path):
     archive, workflow, order, checks = workspace
     draft = workflow.prepare(order, checks)

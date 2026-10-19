@@ -25,6 +25,20 @@ git -C daten config user.email 'DEINE E-MAIL'
 
 Danach initialen Datencommit und `archiv init` wie in der README ausführen. Normale Toolcommits sind durch lokale Hooks gesperrt; eigene vorhandene Hooks werden nicht überschrieben.
 
+## Archivpasswort und Wiederherstellung
+
+`buchhaltung passwort einrichten` richtet ein neues Passwort mit mindestens 16 Zeichen ein. Verwende ein zufälliges Passwort oder eine Passphrase mit mehreren Wörtern. Das Archivpasswort ist unabhängig von GitHub-, GMX- und eBay-Zugangsdaten. Es steht lokal im Klartext in `daten/.env` unter `ENCRYPTION_PASSWORD`; diese Datei wird nicht eingecheckt. Den Rechnerzugang deshalb ebenfalls schützen.
+
+Das Tool erzeugt einen zufälligen langen Datenschlüssel. Nur dessen passwortverschlüsselte Hülle wird in `daten/buchhaltung/key.json` versioniert und gesichert. Backup und Schlüsselhülle allein reichen nicht: Ohne das passende Passwort ist keine Wiederherstellung vorgesehen, und weder GitHub noch Bitcoin können die Daten entschlüsseln. Passwortmanager plus unabhängig verwahrte Notfallkopie verwenden. Das Passwort niemals in die Verfahrensdokumentation schreiben.
+
+Nach `archiv init` mit `buchhaltung passwort pruefen` das Passwort verdeckt aus Erinnerung oder der getrennten Sicherung eingeben. Dieser Befehl prüft es am echten Datenschlüssel und speichert die Eingabe nicht. Er ersetzt keinen vollständigen Restoretest.
+
+Das Dashboard erinnert freiwillig an die Eingabe. Diese Erinnerung ist überspringbar und prüft das Passwort bewusst nicht. Es enthält weder Passwort noch zusätzlichen Passwort-Prüfwert. Nur der Erinnerungszeitpunkt wird, soweit der Browser es erlaubt, für 24 Stunden lokal gespeichert. Die Eingabe wird verworfen; es entsteht kein Passwortschutz für das HTML.
+
+**Passwort nicht durch Bearbeiten der `.env` ändern.** Ein Passwortwechsel benötigt ein geprüftes Neuverschlüsseln der Schlüsselhülle; dafür gibt es derzeit keinen Helfer. Bestehende Sicherungen und historische Schlüsselhüllen benötigen weiterhin das dazu passende Passwort.
+
+Auf einem Ersatzrechner für `sicherung wiederherstellen PAKET --password-file PFAD_ENV --output NEUES_ZIEL` eine lokale Datei `PFAD_ENV` mit genau `ENCRYPTION_PASSWORD='DAS-GESICHERTE-PASSWORT'` anlegen. Diese Datei gehört weder ins Backup noch in Git. Das Paket enthält die Schlüsselhülle, beide Git-Historien und Wiederherstellungshinweise. Eine Wiederherstellungsprobe mit der getrennten Passwortkopie durchführen.
+
 ## eBay und GMX/DHL
 
 Alle Werte gehören in `daten/.env`. Platzhalter ersetzen; vorhandene Werte erhalten:
@@ -61,11 +75,11 @@ Falls die Sendungsnummer nichts findet, mit `Maxibrief` oder `Online Frankierung
 
 ## Vine
 
-Der aktuelle eBay-Rechnungsentwurf prüft zusätzlich den Vine-Bestand. `buchhaltung rechnung prepare` benötigt deshalb **auch** `VINE_BACKEND_URL` und `VINE_BACKEND_TOKEN` für ein vorhandenes kompatibles Vine-Backend. Kein voreingestellter öffentlicher Zugang; eine beliebige Backend-Adresse genügt nicht. Ohne diesen Zugang funktionieren Archiv, Dashboard und eBay-Abruf, aber dieser Rechnungsentwurfsablauf bricht ab.
+Vine ist optional. Ohne `VINE_BACKEND_URL` und `VINE_BACKEND_TOKEN` wird die Bestandsprüfung ausdrücklich als nicht konfiguriert protokolliert, ohne den eBay-Entwurf zu blockieren. Sind beide gesetzt, wird das vorhandene kompatible Backend gelesen; Fehler werden nicht still übergangen. Unvollständige Konfiguration wird gemeldet. Es gibt keinen voreingestellten öffentlichen Backend-Zugang. Manuelle Rechnungen benötigen grundsätzlich keine dieser Anbindungen.
 
 ## Rechnungsprofil
 
-Nach Archivinitialisierung das eigene Absenderprofil als JSON **außerhalb** von Tool- und Datenrepo erstellen, etwa `C:/bk/rechnungsprofil.json`:
+Nach Archivinitialisierung mit `buchhaltung rechnung configure --interactive --last-number 0000` das Absenderprofil im Dialog erfassen und prüfen. `0000` gilt ausschließlich für einen leeren neuen Rechnungsbestand. Alternativ bleibt die folgende Profildatei für Automatisierungen unterstützt: JSON **außerhalb** von Tool- und Datenrepo erstellen, etwa `C:/bk/rechnungsprofil.json`:
 
 ```json
 {

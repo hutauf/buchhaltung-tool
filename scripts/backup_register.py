@@ -43,4 +43,5 @@ def main():
 if __name__=='__main__':
     try: sys.exit(main())
     except Exception as exc:
-        print(json.dumps({'ok':False,'error_type':type(exc).__name__, 'hint':'Sicherungs-/Publikationsstatus prüfen; vorhandenen Export bei Bedarf registrieren'}));sys.exit(1)
+        from autobookkeeping.diagnostics import failure
+        print(json.dumps(failure(exc,root if 'root' in globals() else TOOL/'daten'),ensure_ascii=False));sys.exit(1)

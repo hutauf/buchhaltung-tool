@@ -36,4 +36,5 @@ if __name__=='__main__':
     args=parser.parse_args()
     try: print(json.dumps(restore(args.source,args.password_file,args.output),ensure_ascii=False))
     except Exception as exc:
-        print(json.dumps({'ok':False,'error_type':type(exc).__name__}));sys.exit(1)
+        from autobookkeeping.diagnostics import failure
+        print(json.dumps(failure(exc),ensure_ascii=False));sys.exit(1)

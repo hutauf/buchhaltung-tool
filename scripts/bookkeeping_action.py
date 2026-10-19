@@ -27,10 +27,11 @@ def resolve(catalog, reference):
 
 def command(args, section, row):
     rid = row["id"]
+    interactive=getattr(args,'interactive',False)
     if args.action == 'supplier-credit-inspect':
         if section!='records' or row['kind']!='expense' or not args.file:
             raise WorkflowError('Originalausgabe und Pfad zum Lieferanten-Korrekturbeleg erforderlich')
-        return ['receipt.py','inspect',str(args.file),'--original-id',rid]
+        return ['receipt.py','neu' if interactive else 'inspect',str(args.file),'--original-id',rid]
     if args.action == "preview":
         if not args.output: raise WorkflowError("Neuen Ausgabeordner außerhalb des Repos angeben")
         if row.get("kind", "invoice") in ("expense", "expense_credit"):
@@ -58,9 +59,9 @@ def command(args, section, row):
         return ["local_invoice.py", "expense", rid, "--receipt-sha256", sha(encoded(value["receipt_candidate"])), "--approved"]
     if args.action in ("cancel-prepare", "refund-prepare", "correct-prepare"):
         if row["kind"] != "invoice" or section != "records": raise WorkflowError("Ausgestellte Originalrechnung erforderlich")
-        if not args.metadata: raise WorkflowError("Geprüfte Korrekturmetadaten außerhalb des Repos angeben")
+        if not args.metadata and not interactive: raise WorkflowError('Korrektur mit --interactive erfassen oder geprüfte Metadaten angeben')
         kind = {"cancel-prepare": "cancellation", "refund-prepare": "partial_refund", "correct-prepare": "correction"}[args.action]
-        return ["local_invoice.py", "adjustment-prepare", rid, "--kind", kind, "--metadata", str(args.metadata)]
+        return ["local_invoice.py", "adjustment-prepare", rid, "--kind", kind, *(['--interactive'] if interactive else ['--metadata',str(args.metadata)])]
     raise WorkflowError("Aktion nicht unterstützt")
 
 
@@ -72,6 +73,7 @@ def main():
     parser.add_argument("--number"); parser.add_argument("--metadata", type=Path); parser.add_argument("--output", type=Path)
     parser.add_argument('--file',type=Path)
     parser.add_argument("--e-invoice", action="store_true", help="Archivierte Rechnungs-XML zusätzlich ansehen")
+    parser.add_argument('--interactive',action='store_true',help='Geprüfte Angaben im Terminal erfassen; keine JSON-Datei nötig')
     parser.add_argument("--approved", action="store_true"); args = parser.parse_args()
     if not re.fullmatch(r"[a-f0-9]{64}", args.snapshot): raise WorkflowError("Ungültiger Dashboard-Snapshot")
     with FileLock(ROOT / "output/archive.lock", timeout=0):
@@ -92,10 +94,12 @@ def main():
                     atomic(target / Path(name[:-4]).name,archive.read(name))
         atomic(target / "metadaten.json", encoded(row))
         print(json.dumps({"ok": True, "output": str(target)}, ensure_ascii=False)); return 0
-    if args.action in ("finish", "payments", "dhl-expense") and not args.approved:
+    if args.action in ("finish", "payments", "dhl-expense") and not args.approved and not (args.action=='payments' and args.interactive):
         raise WorkflowError("Konkreter Abschluss/Zahlung benötigt --approved")
     environment = dict(os.environ, BOOKKEEPING_EXPECTED_SNAPSHOT=args.snapshot)
     if args.action == "payments":
+        if args.interactive:
+            return subprocess.call([sys.executable,'-X','utf8',str(TOOL/'scripts/local_invoice.py'),'cash-record','--record-id',row['id'],'--interactive'],cwd=ROOT,env=environment)
         if not args.metadata: raise WorkflowError("Geprüfte Zahlungsmetadaten außerhalb des Repos angeben")
         payload = json.loads(outside(ROOT, args.metadata).read_bytes())
         if payload.get("record_id", row["id"]) != row["id"]: raise WorkflowError("Zahlung gehört zu einem anderen Beleg")
@@ -112,4 +116,5 @@ if __name__ == "__main__":
     except WorkflowError as exc:
         print(json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False)); sys.exit(1)
     except Exception as exc:
-        print(json.dumps({"ok": False, "error_type": type(exc).__name__})); sys.exit(1)
+        from autobookkeeping.diagnostics import failure
+        print(json.dumps(failure(exc,ROOT),ensure_ascii=False)); sys.exit(1)

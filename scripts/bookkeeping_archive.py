@@ -14,6 +14,7 @@ sys.path.insert(0, str(TOOL / "src"))
 from autobookkeeping.workspace import data_root
 ROOT = TOOL / "daten"
 from autobookkeeping.publication import Publication
+from autobookkeeping.local_invoices import WorkflowError
 from autobookkeeping.archive import Archive, atomic, cd_export, cd_verify, checkpoint, outside, unseal, verify_checkpoint
 
 
@@ -26,7 +27,7 @@ def arguments():
     p.add_argument("--pdf", type=Path, action="append", required=True)
     p = sub.add_parser("evidence", help="Abrechnung/Zahlungsnachweis/Original archivieren; keine Ausgabe buchen")
     p.add_argument("--file", type=Path, required=True)
-    p.add_argument("--metadata", type=Path, required=True)
+    p.add_argument("--metadata", type=Path); p.add_argument('--interactive',action='store_true')
     sub.add_parser("verify")
     p = sub.add_parser("report")
     p.add_argument("--year")
@@ -55,11 +56,14 @@ def arguments():
 def run(args):
     archive = Archive(ROOT)
     if args.command == "init":
+        if not archive.key_path.exists() and len(archive.password)<16:
+            raise WorkflowError('Neues Archiv benötigt mindestens 16 Passwortzeichen; mit buchhaltung passwort einrichten vorbereiten')
         archive.init()
         result = {"ok": True}
     elif args.command == "import-local":
         result = archive.import_local(args.metadata, args.pdf)
     elif args.command == "evidence":
+        if not args.metadata: raise WorkflowError('Nachweismetadaten mit --interactive erfassen oder --metadata angeben')
         result = archive.import_evidence(args.file, args.metadata)
     elif args.command == "verify":
         result = archive.verify()
@@ -133,8 +137,7 @@ def run(args):
     return result
 
 
-def main() -> int:
-    args = arguments()
+def execute(args) -> int:
     data_root()
     (ROOT / "output").mkdir(exist_ok=True)
     proof_write = args.command == "stamp" or args.command == "timestamps" and args.action == "upgrade"
@@ -151,12 +154,26 @@ def main() -> int:
     return result
 
 
+def main() -> int:
+    args=arguments()
+    if args.command=='evidence' and args.interactive:
+        if args.metadata: raise ValueError('Entweder --interactive oder --metadata angeben')
+        from autobookkeeping import guided
+        from autobookkeeping.archive import encoded
+        payload=guided.confirm({'date':guided.day('Nachweisdatum'),'description':guided.ask('Beschreibung'),
+                                'verification_basis':guided.ask('Quelle und Prüfung des Nachweises')})
+        with tempfile.TemporaryDirectory(prefix='bookkeeping-evidence-') as temporary:
+            args.metadata=Path(temporary)/'metadata.json';atomic(args.metadata,encoded(payload))
+            return execute(args)
+    return execute(args)
+
+
 
 if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except Exception as exc:
         # Authentication failures and HTTP/API errors must not leak passwords/URLs.
-        print(json.dumps({"ok": False, "error_type": type(exc).__name__,
-                          "hint": "Passwort, Quelldaten, Pfade und Integrität prüfen; bei unterbrochener Veröffentlichung publish_bookkeeping.py status und resume verwenden"}))
+        from autobookkeeping.diagnostics import failure
+        print(json.dumps(failure(exc,ROOT),ensure_ascii=False))
         raise SystemExit(1)

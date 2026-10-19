@@ -238,3 +238,15 @@ eBay/DHL/Vine, GitHub-API und Bitcoin werden dabei nicht live getestet.
 Der Test erzeugt keine Buchung im Nutzerrepo. CI prüft Python 3.11/3.13 unter Windows
 und Linux. Ein frisches Venv auf demselben Rechner ist kein physischer Ersatzrechner.
 Ohne Windows-Unterstützung langer Pfade einen kurzen Testpfad wie `C:\bk1` verwenden.
+
+## Geführte Alltagsbefehle ohne selbst erstellte JSON-Dateien
+
+- `buchhaltung beleg neu PFAD`: Original lesen, Metadaten im Dialog prüfen und als Entwurf vormerken; danach separat freigeben.
+- `buchhaltung beleg prepare REVIEW_JSON --interactive`: bereits erzeugte Prüfkopie im Dialog ergänzen.
+- `buchhaltung rechnung manual-prepare --interactive`: manueller Verkaufsentwurf ohne eBay/DHL/Vine; eindeutige eigene Referenz verwenden. Bei Regelbesteuerung zusätzlich `--vat-rates` mit einem Satz je Position. Zahlung später separat zuordnen.
+- `buchhaltung rechnung configure --interactive --last-number 0000`: Profil für einen neuen leeren Rechnungsbestand; bestehenden Nummernstand niemals durch 0000 ersetzen.
+- Zahlungen und Korrekturen: beim Beleg den passenden Dashboard-Befehl kopieren. Er startet einen Dialog statt eine selbst erstellte JSON-Datei zu verlangen. Die Zahlung wird erst nach Anzeige aller konkreten Angaben und Eingabe von `BUCHEN` freigegeben. Minderungs- und Berichtigungsentwürfe bleiben vom Abschluss getrennt.
+- `buchhaltung archiv evidence --file PFAD --interactive`: Zusatznachweis ohne erfundene Ausgabenbuchung sichern.
+- `buchhaltung passwort einrichten` für neue Archive; `buchhaltung passwort pruefen` testet die verdeckte Eingabe am Datenschlüssel. [Passwort und Datenrettung](einrichtung.md#archivpasswort-und-wiederherstellung).
+
+Die freiwillige Dashboard-Passworterinnerung ist ausdrücklich ungeprüft und überspringbar. Kein Passwort oder Hash wird im HTML gespeichert; nur der Erinnerungszeitpunkt kann lokal für 24 Stunden hinterlegt werden. Sicherungsmedien und Restoretests sind Empfehlungen mit sichtbarem Status, keine Buchungssperren. Eine CD ist nicht Voraussetzung des Tools. Historische Bitcoin-Zählwerte sind kein Live-Publikationsstatus. Bei einem CLI-Abbruch zuerst `buchhaltung veroeffentlichen status`, anschließend `resume`; nicht erneut buchen.

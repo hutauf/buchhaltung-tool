@@ -199,7 +199,7 @@ def generate_xml(invoice: dict, draft=False):
     if invoice.get('delivery_date'):b(a(root,'Delivery'),'ActualDeliveryDate',invoice['delivery_date'])
     if not credit:
         b(a(root,'PaymentMeans'),'PaymentMeansCode','1')
-        b(a(root,'PaymentTerms'),'Note','Bereits bezahlt; kein erneuter Zahlungsauftrag.')
+        b(a(root,'PaymentTerms'),'Note','Zahlung gemäß Vereinbarung; Zahlungsnachweis separat zuordnen.' if invoice.get('entry_source')=='manual' else 'Bereits bezahlt; kein erneuter Zahlungsauftrag.')
     tax=a(root,'TaxTotal');money(tax,'TaxAmount',invoice['vat'])
     for group in invoice['vat_breakdown']:
         sub=a(tax,'TaxSubtotal');money(sub,'TaxableAmount',group['net']);money(sub,'TaxAmount',group['vat'])
@@ -209,8 +209,9 @@ def generate_xml(invoice: dict, draft=False):
         b(a(category,'TaxScheme'),'ID','VAT')
     total=a(root,'LegalMonetaryTotal')
     for name,key in (('LineExtensionAmount','net'),('TaxExclusiveAmount','net'),('TaxInclusiveAmount','gross')):money(total,name,invoice[key])
-    if not credit:money(total,'PrepaidAmount',invoice['gross'])
-    money(total,'PayableAmount',invoice['gross'] if credit else '0.00')
+    manual=invoice.get('entry_source')=='manual'
+    if not credit:money(total,'PrepaidAmount','0.00' if manual else invoice['gross'])
+    money(total,'PayableAmount',invoice['gross'] if credit or manual else '0.00')
     for index,p in enumerate(invoice['positions'],1):
         line=a(root,'CreditNoteLine' if credit else 'InvoiceLine');b(line,'ID',index)
         quantity=Decimal(str(p['quantity']))

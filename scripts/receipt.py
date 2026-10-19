@@ -23,14 +23,30 @@ def main():
     p=sub.add_parser("inspect",help="PDF/XML/Bild lokal lesen; XML validieren und Metadaten außerhalb vorbefüllen")
     p.add_argument("path",type=Path);p.add_argument("--output",type=Path)
     p.add_argument('--original-id',help='Vorhandene Originalausgabe für Lieferanten-Storno/Minderung')
+    p=sub.add_parser('neu',help='Original lesen und Metadaten im Terminal erfassen; nur Entwurf, keine Ausgabenbuchung')
+    p.add_argument('path',type=Path);p.add_argument('--output',type=Path);p.add_argument('--original-id')
     p=sub.add_parser("prepare",help="Geprüfte Metadaten verschlüsselt vormerken; noch keine Ausgabe buchen")
-    p.add_argument("review",type=Path);p.add_argument("--metadata",type=Path,required=True)
+    p.add_argument("review",type=Path);p.add_argument("--metadata",type=Path);p.add_argument('--interactive',action='store_true')
     sub.add_parser("list",help="Ungebuchte Belegvormerkungen anzeigen")
     p=sub.add_parser("show");p.add_argument("id")
     p=sub.add_parser("book",help="Genau die freigegebene Metadatenrevision als Ausgabe buchen")
     p.add_argument("id");p.add_argument("--revision",required=True);p.add_argument("--approved",action="store_true")
     p=sub.add_parser("discard");p.add_argument("id")
     args=parser.parse_args();data_root();(ROOT/"output").mkdir(exist_ok=True)
+    if args.command=='neu':
+        base=Path(os.environ.get('LOCALAPPDATA') or Path.home()/'.cache')/'BuchhaltungTool'/'belegpruefung'
+        with FileLock(ROOT/'output/archive.lock',timeout=0):
+            result=Receipts(LocalInvoices(Archive(ROOT))).inspect(args.path,args.output or base/uuid.uuid4().hex,args.original_id)
+        print('Original und Prüfkopien:',Path(result['review']).parent)
+        args.command='prepare';args.review=Path(result['review']);args.metadata=Path(result['metadata']);args.interactive=True
+    if args.command=='prepare':
+        if not args.metadata and not args.interactive: raise WorkflowError('--interactive oder geprüfte --metadata angeben')
+        if args.interactive:
+            from autobookkeeping import guided
+            template=args.metadata or args.review.parent/'metadaten.json'
+            payload=guided.receipt(json.loads(template.read_bytes()))
+            from autobookkeeping.archive import atomic,encoded,outside
+            args.metadata=outside(ROOT,args.review.parent/'metadaten-geprueft.json');atomic(args.metadata,encoded(payload))
     with Publication(ROOT, "receipt " + args.command, enabled=args.command in ['prepare', 'book', 'discard']) as publication:
         with FileLock(ROOT/"output/archive.lock",timeout=0):
             workflow=LocalInvoices(Archive(ROOT));receipts=Receipts(workflow)
@@ -55,4 +71,5 @@ if __name__=="__main__":
     except WorkflowError as exc:
         print(json.dumps({"ok":False,"error":str(exc)},ensure_ascii=False));sys.exit(1)
     except Exception as exc:
-        print(json.dumps({"ok":False,"error_type":type(exc).__name__,"hint":"Quelle, Passwort und Metadaten prüfen; bei unterbrochener Veröffentlichung publish_bookkeeping.py status und resume verwenden"}));sys.exit(1)
+        from autobookkeeping.diagnostics import failure
+        print(json.dumps(failure(exc,ROOT),ensure_ascii=False));sys.exit(1)

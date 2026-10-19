@@ -2,6 +2,17 @@
 
 ## Unveröffentlicht
 
+- Geführte Beleg-, Zahlungs-, Korrektur- und Profilerfassung ohne selbst erstellte
+  JSON-Dateien; manuelle Rechnungsentwürfe ohne externe Dienste. Vine optional,
+  konfigurierte Fehler werden weiterhin gemeldet. Freigaben bleiben getrennt.
+- Überspringbare Passwort-Erinnerung ohne Passwort/Hash im HTML, lokale verdeckte
+  Schlüsselprüfung und Einrichtung mit unabhängiger Passwortsicherung.
+- Sichere verständliche Fehlermeldungen, Hinweise zur Wiederaufnahme, passende
+  Restore-Befehle je Sicherung und unverbindliche Sicherungsempfehlungen.
+  Historische Nachweise und Jahresüberschuss inkl. Homeoffice klarer eingeordnet.
+- Verfahrensbeschreibung Version 7 und Einrichtungs-/Wiederherstellungsanleitung
+  beschreiben die neuen Abläufe und die tatsächlichen Grenzen.
+
 - Erstkonfiguration mit betrieblicher Dokumentation lässt sich wieder vor der
   Archivinitialisierung committen. CI bewahrt auch bei fehlgeschlagenem
   Neueinrichtungs-/Wiederherstellungstest das synthetische Diagnoseprotokoll auf.

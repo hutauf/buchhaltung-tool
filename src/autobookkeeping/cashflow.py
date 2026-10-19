@@ -66,7 +66,7 @@ def document_flows(catalog: dict, row: dict) -> tuple[list[dict], list[str]]:
             append(row["gross"],row["pay_date"],"ebay-paid","ebay_paid","income")
             warnings.append("eBay-Käuferzahlung: Verfügbarkeit/Abrechnung noch abgleichen")
         else:
-            warnings.append("Zahlungsnachweis fehlt; Ersatzrechnung erzeugt keinen neuen Geldeingang")
+            warnings.append('Manuelle Rechnung: tatsächliche Zahlung separat zuordnen' if row.get('entry_source')=='manual' else "Zahlungsnachweis fehlt; Ersatzrechnung erzeugt keinen neuen Geldeingang")
     elif kind=="expense":
         if row.get("pay_date"):
             append(-decimal_money(row.get("paid_amount") or row["gross"]),row["pay_date"],"expense-payment","source_pay_date","expense")

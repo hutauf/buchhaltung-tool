@@ -164,7 +164,7 @@ def render_pdf(invoice: dict, draft: bool) -> bytes:
     facts = [[p("Belegnummer", small), p("noch nicht vergeben" if draft else invoice.get("document_number") or invoice["number"], bold)],
              [p("Entwurfsdatum" if draft else "Rechnungsdatum", small), p(datetime.fromisoformat(invoice["date"]).strftime("%d.%m.%Y"))],
              [p("Lieferdatum", small), p(datetime.fromisoformat(invoice["delivery_date"]).strftime("%d.%m.%Y") if invoice.get("delivery_date") else "noch zu prüfen")],
-             [p("eBay-Bestellung", small), p(invoice["order_id"])]]
+             [p("Auftragsreferenz" if invoice.get('entry_source') == 'manual' else "eBay-Bestellung", small), p(invoice.get('manual_reference') or invoice["order_id"])]]
     facts_table = Table(facts, colWidths=[43*mm, 127*mm])
     facts_table.setStyle(TableStyle([("VALIGN", (0,0), (-1,-1), "TOP"), ("LEFTPADDING",(0,0),(-1,-1),0), ("BOTTOMPADDING",(0,0),(-1,-1),4)]))
     story.extend([facts_table, Spacer(1, 7*mm), p(seller["introduction"]), Spacer(1, 5*mm)])
@@ -193,7 +193,7 @@ def render_pdf(invoice: dict, draft: bool) -> bytes:
         else:
             for group in invoice["vat_breakdown"]:
                 story.append(p(f"Netto {euro(group['net'])} + {group['vat_rate']} % USt {euro(group['vat'])} = {euro(group['gross'])}"))
-        story.extend([Spacer(1, 3*mm), p("Bereits über eBay bezahlt." if document_type == "invoice" else
+        story.extend([Spacer(1, 3*mm), p(("Zahlung separat zuordnen." if invoice.get('entry_source') == 'manual' else "Bereits über eBay bezahlt.") if document_type == "invoice" else
                                             "Dieses Dokument löst keine Auszahlung aus. Die Rückzahlung wird separat erfasst.")])
     if invoice.get("reason"):
         story.extend([Spacer(1, 3*mm), p("Grund: " + invoice["reason"])])
@@ -300,16 +300,42 @@ class LocalInvoices:
 
     def prepare(self, order: EbayOrder, checks: dict, attachment: tuple[dict, bytes] | None = None,
                 rates: list[int] | None = None, replacement_of: str | None = None) -> dict:
+        vine_ok = checks.get('vine_checked') or checks.get('vine_status') == 'not_configured'
+        if not vine_ok or not checks.get('dhl_checked'):
+            raise WorkflowError('DHL-Leseprüfung und konfigurierte Vine-Prüfung vor dem Entwurf erforderlich')
+        return self._prepare(order_snapshot(order), checks, attachment, rates, replacement_of)
+
+    def prepare_manual(self, payload: dict, rates=None) -> dict:
+        from datetime import date as calendar_day
+        buyer = payload.get('buyer', {})
+        if buyer.get('country_iso') != 'DE' or not all(isinstance(buyer.get(k),str) and buyer[k].strip() for k in ('name','street','postal_code','city')):
+            raise WorkflowError('Manuelle Rechnung benötigt eine vollständige inländische Anschrift')
+        reference = payload.get('reference'); basis = payload.get('verification_basis')
+        if not isinstance(reference,str) or not reference.strip() or not isinstance(basis,str) or not basis.strip():
+            raise WorkflowError('Eindeutige Auftragsreferenz und konkrete Quellenprüfung erforderlich')
+        delivery = payload.get('delivery_date')
+        if not isinstance(delivery,str) or len(delivery)!=10: raise WorkflowError('Liefer-/Leistungsdatum fehlt')
+        calendar_day.fromisoformat(delivery)
+        positions=[]
+        for row in payload.get('positions',[]):
+            quantity=row.get('quantity'); price=amount(row.get('unit_gross'))
+            if type(quantity) is not int or quantity<=0 or Decimal(price)<=0 or not str(row.get('title') or '').strip():
+                raise WorkflowError('Jede Position benötigt Bezeichnung, positive ganze Menge und positiven Centbetrag')
+            positions.append(dict(title=row['title'].strip(),quantity=quantity,unit='Stk.',unit_gross=price,gross=amount(Decimal(price)*quantity),vat_rate=0))
+        if not positions: raise WorkflowError('Mindestens eine Rechnungsposition erforderlich')
+        snapshot=dict(order_id='manual:'+sha(reference.strip().encode()),sales_record_number=None,order_id_aliases=[],order_status='manual',
+                      paid_at=None,delivery_date=delivery,tracking_number=None,buyer=dict(buyer),positions=positions,currency='EUR',
+                      gross=amount(sum((Decimal(p['gross']) for p in positions),Decimal(0))),entry_source='manual',manual_reference=reference.strip())
+        return self._prepare(snapshot,{'entry_source':'manual','verification_basis':basis.strip(),'vine_status':'not_applicable','dhl_status':'not_applicable'},None,rates,None)
+
+    def _prepare(self, snapshot, checks, attachment, rates, replacement_of):
         self.archive.verify()
         before = self.archive.catalog(); after = copy.deepcopy(before)
         config = after.get("local_invoice_settings")
         if not config:
             raise WorkflowError("Absenderprofil zuerst einrichten")
-        if not checks.get("vine_checked") or not checks.get("dhl_checked"):
-            raise WorkflowError("DHL- und Vine-Leseprüfungen vor dem Entwurf erforderlich")
         if checks.get("invoice_matches") or checks.get("expense_matches"):
             raise WorkflowError("Prüfung meldet eine vorhandene Rechnung oder Ausgabe für diese Bestellung")
-        snapshot = order_snapshot(order)
         self.check_duplicates(after, snapshot, replacement_of)
         tax = calculate(snapshot["positions"], config["seller"]["small_business"], rates)
         existing = [d for d in after["local_invoice_drafts"].values()
@@ -384,7 +410,7 @@ class LocalInvoices:
         self.commit(before, after, {})
         return {"ok": True, "mode": "local", "last_service_number": last_service_number}
 
-    def issue(self, invoice_id: str, expected_revision: str, expected_number: str, order: EbayOrder, approved: bool) -> dict:
+    def issue(self, invoice_id: str, expected_revision: str, expected_number: str, order: EbayOrder | None, approved: bool) -> dict:
         if not approved:
             raise WorkflowError("Ausstellung benötigt ausdrückliche Freigabe")
         self.archive.verify()
@@ -394,7 +420,13 @@ class LocalInvoices:
         value = after["local_invoice_drafts"][invoice_id]; current = value["current"]
         if current["status"] != "test_draft" or current["revision"] != expected_revision:
             raise WorkflowError("Entwurf wurde geändert, verworfen oder bereits ausgestellt")
-        source = order_snapshot(order)
+        manual = current.get('entry_source') == 'manual'
+        if manual:
+            if order is not None: raise WorkflowError('Manuellen Entwurf ohne eBay-Quelle abschließen')
+            source = {k:copy.deepcopy(current[k]) for k in ('order_id','sales_record_number','order_id_aliases','order_status','paid_at','delivery_date','tracking_number','buyer','positions','currency','gross','entry_source','manual_reference')}
+        else:
+            if order is None: raise WorkflowError('Aktuelle eBay-Quelle fehlt')
+            source = order_snapshot(order)
         tax = calculate(source["positions"], current["small_business"], [p["vat_rate"] for p in current["positions"]])
         source.update(tax)
         if current["seller"] != after["local_invoice_settings"]["seller"]:
@@ -411,7 +443,8 @@ class LocalInvoices:
         invoice.update(id="local:invoice:" + invoice_id.split(":")[-1], number=number, status="issued",
                        date=today(), year=today()[:4], issued_at=now(), source="local", kind="invoice",
                        source_id=invoice_id.split(":")[-1], coverage="complete", vat_basis=current["tax_treatment"],
-                       payment_status="paid", pay_date=day(order.paid_at), outstanding="0.00", draft_id=invoice_id)
+                       payment_status="unpaid" if manual else "paid", pay_date=None if manual else day(order.paid_at),
+                       outstanding=current['gross'] if manual else "0.00", draft_id=invoice_id)
         invoice.pop("revision")
         pdf = render_pdf(invoice, draft=False)
         name = f"{invoice['year']}/Rechnungen/{sha((invoice['id'] + ':' + sha(pdf)).encode())}.pdf.enc"

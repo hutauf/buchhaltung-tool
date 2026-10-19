@@ -39,4 +39,5 @@ def main():
 if __name__=='__main__':
     try: main()
     except Exception as exc:
-        print(json.dumps({'ok':False,'error_type':type(exc).__name__, 'hint':'API-Zugang, Fenster und Veröffentlichen-Status prüfen; keine Buchung wurde durch den Abgleich angelegt'}));sys.exit(1)
+        from autobookkeeping.diagnostics import failure
+        print(json.dumps(failure(exc,TOOL/'daten'),ensure_ascii=False));sys.exit(1)

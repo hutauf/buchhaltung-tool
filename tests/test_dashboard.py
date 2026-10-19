@@ -12,6 +12,50 @@ ROOT=Path(__file__).resolve().parents[1]
 SCRIPT=runpy.run_path(str(ROOT/"scripts/build_bookkeeping_dashboard.py"))
 
 
+def test_password_reminder_only_persists_timestamp_and_is_skippable():
+    node=shutil.which('node')
+    if not node: pytest.skip('Node required')
+    source=(ROOT/'scripts/dashboard_view.html').read_text(encoding='utf8')
+    script=source.split('function reminderRecent')[1].split("$('basis').textContent")[0]
+    script='function reminderRecent'+script
+    program=r"""
+const vm=require('vm'),fs=require('fs'),assert=require('assert'),controls={},stored={};
+const $=id=>controls[id]||(controls[id]={value:'',addEventListener(){}});
+const context={$,showView(){},localStorage:{getItem:k=>stored[k],setItem:(k,v)=>stored[k]=v}};
+vm.createContext(context);vm.runInContext(JSON.parse(fs.readFileSync(0,'utf8')),context);
+assert.strictEqual($('password-reminder').hidden,false);
+$('memory-password').value='SYNTHETIC-SECRET';$('memory-confirm').onclick();
+assert.strictEqual($('memory-password').value,'');assert.strictEqual($('password-reminder').hidden,true);
+assert.strictEqual(Object.keys(stored).length,1);assert(/^\d+$/.test(Object.values(stored)[0]));
+assert(!JSON.stringify(stored).includes('SYNTHETIC-SECRET'));
+$('memory-password').value='SYNTHETIC-OTHER';$('memory-skip').onclick();assert.strictEqual($('memory-password').value,'');
+assert.strictEqual(vm.runInContext('reminderRecent(Date.now()+1000)',context),false);
+assert.strictEqual(vm.runInContext('reminderRecent(Date.now()-86400001)',context),false);
+"""
+    subprocess.run([node,'-e',program],input=json.dumps(script).encode(),capture_output=True,check=True,timeout=15)
+    assert 'nicht geprüft' in source and 'Passwortschutz' in source
+
+
+def test_backup_actions_target_the_medium_named_by_restore_warning():
+    node=shutil.which('node')
+    if not node:pytest.skip('Node required')
+    source=(ROOT/'scripts/dashboard_view.html').read_text(encoding='utf8')
+    script='function renderControls'+source.split('function renderControls')[1].split('renderControls();')[0]
+    program=r"""
+const vm=require('vm'),fs=require('fs'),assert=require('assert'),controls={};
+const $=id=>controls[id]||(controls[id]={});
+const context={$,esc:String,python:'buchhaltung ',psQuote:s=>"'"+s+"'",DATA:{backups:{rows:[
+ {ref:'backup:A',readback_at:'2011-01-02',restore_result:'untested',data_commit:'a'.repeat(40)},
+ {ref:'backup:B',readback_at:null,restore_result:'untested',data_commit:'b'.repeat(40)}]}}};
+vm.createContext(context);vm.runInContext(JSON.parse(fs.readFileSync(0,'utf8')),context);vm.runInContext('renderControls()',context);
+assert($('backup-status').textContent.includes('Wiederherstellung noch prüfen'));
+assert($('backup-commands').innerHTML.includes("test --id 'backup:A'"));
+assert($('backup-commands').innerHTML.includes("bestaetigen --id 'backup:B'"));
+assert($('timestamp-status').textContent.startsWith('Historische Bitcoin'));
+"""
+    subprocess.run([node,'-e',program],input=json.dumps(script).encode(),capture_output=True,check=True,timeout=15)
+
+
 def row():
     return {"id":"opaque-1","kind":"invoice","source":"imported","date":"2011-01-02","status":"paid",
             "number":"0001","gross":"119.00","net":"100.00","vat":"19.00","vat_rate":19,"year":"2011",
