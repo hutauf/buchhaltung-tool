@@ -29,7 +29,7 @@ def staged_repo(tmp_path):
     (repo/".env").write_text("ENCRYPTION_PASSWORD=synthetic-password\n",encoding="utf8")
     archive=Archive(repo);archive.init();catalog=archive.catalog();catalog["records"]["opaque-1"]={"current":row(),"history":[]};archive.save_catalog(catalog)
     SCRIPT["build"](repo, tool=repo)
-    git("add","buchhaltung","src","scripts","dashboard.html");git("commit","-m","Synthetic initial archive")
+    git("add","buchhaltung","src","scripts","docs","dashboard.html");git("commit","-m","Synthetic initial archive")
     return repo,archive,git
 
 
@@ -324,3 +324,68 @@ controls.csv.onclick();assert.strictEqual(exports[0].csv.split('\r\n').length,58
 controls['page-size'].value='100';controls['page-size'].events.change();assert(controls['page-info'].textContent.startsWith('1–57'));
 assert.strictEqual(JSON.stringify(DATA),before);
 """,rows)
+
+
+def test_procedure_is_embedded_from_matching_staged_source(staged_repo):
+    repo,archive,git=staged_repo
+    from bs4 import BeautifulSoup
+    source=repo/'docs/verfahrensdokumentation.md'
+    page=BeautifulSoup((repo/'dashboard.html').read_bytes(),'html.parser')
+    assert page.select_one('#procedure-document article h1').get_text()=='Verfahrensdokumentation der lokalen Belegablage'
+    assert sha(source.read_bytes()) in page.select_one('#procedure-document').get_text()
+    assert len(page.select('#procedure-document table'))>=2
+    contents=page.select('#procedure-document .procedure-toc a[href]')
+    assert len(contents)>=4 and all(page.find(id=link['href'][1:]) for link in contents)
+    assert 'Private betriebliche Ergänzung fehlt' in page.get_text()
+    source.write_bytes(source.read_bytes()+b'\n## Synthetic new process\n\nPreserved procedure update.\n')
+    with pytest.raises(ValueError,match='nicht vorgemerkte'):
+        SCRIPT['build'](repo,tool=repo,staged=True,check=True)
+    git('add','docs/verfahrensdokumentation.md')
+    SCRIPT['build'](repo,tool=repo,staged=True)
+    SCRIPT['build'](repo,tool=repo,staged=True,check=True)
+    assert b'Preserved procedure update.' in (repo/'dashboard.html').read_bytes()
+    assert sha(source.read_bytes()).encode() in (repo/'dashboard.html').read_bytes()
+
+
+def test_private_operating_contents_never_enter_dashboard(staged_repo):
+    repo,archive,git=staged_repo
+    private=repo/'verfahrensdokumentation.md';private.write_text('PRIVATE NAME AND ADDRESS',encoding='utf8')
+    git('add','verfahrensdokumentation.md');SCRIPT['build'](repo,tool=repo,staged=True)
+    rendered=(repo/'dashboard.html').read_bytes()
+    assert b'href="verfahrensdokumentation.md"' in rendered
+    assert b'PRIVATE NAME' not in rendered
+    private.write_text('SECRET UNSTAGED OPERATING DETAILS',encoding='utf8')
+    SCRIPT['build'](repo,tool=repo,staged=True,check=True)
+    assert (repo/'dashboard.html').read_bytes()==rendered
+    git('reset','--','verfahrensdokumentation.md')
+    SCRIPT['build'](repo,tool=repo,staged=True)
+    assert b'href="verfahrensdokumentation.md"' not in (repo/'dashboard.html').read_bytes()
+
+
+def test_procedure_renderer_escapes_html_and_keeps_links_passive():
+    from autobookkeeping.dashboard import procedure_document
+    from bs4 import BeautifulSoup
+    source=b'# Procedure <script>bad()</script>\n\n[unsafe](javascript:bad) [source](https://example.invalid/source)\n\n```html\n<img src="remote" onerror="bad()">\n```\n\n**Check** and `code`'
+    page=BeautifulSoup(procedure_document(source),'html.parser')
+    assert page.select('script,img,iframe,link')==[]
+    links=page.select('a[href]');assert len(links)==1
+    assert links[0]['href']=='https://example.invalid/source' and links[0]['rel']==['noopener','noreferrer']
+    assert page.select_one('strong').get_text()=='Technik und tatsächlicher Betrieb gehören zusammen.'
+    assert '<img src="remote"' in page.select_one('pre').get_text()
+    template=(ROOT/'scripts/dashboard_view.html').read_bytes()
+    data=html({'literal':'__BOOKKEEPING_PROCEDURE__'},template,b'# __BOOKKEEPING_DATA__')
+    public=json.loads(data.decode().split('<script id="bookkeeping-data" type="application/json">')[1].split('</script>')[0])
+    assert public['literal']=='__BOOKKEEPING_PROCEDURE__'
+    assert b'<h1 id="procedure-part-0">__BOOKKEEPING_DATA__</h1>' in data
+
+
+def test_procedure_tab_navigation_and_keyboard_wrap():
+    dashboard_runtime(r"""
+controls['nav-procedure'].onclick();assert.strictEqual(controls['view-procedure'].hidden,false);
+assert.strictEqual(controls['view-overview'].hidden,true);assert.strictEqual(controls['nav-procedure'].attrs['aria-selected'],'true');
+controls['nav-procedure'].events.keydown({key:'ArrowRight',preventDefault(){}});
+assert.strictEqual(controls['view-overview'].hidden,false);
+controls['nav-overview'].events.keydown({key:'End',preventDefault(){}});
+assert.strictEqual(controls['view-procedure'].hidden,false);
+controls['archive-to-procedure'].onclick();assert.strictEqual(controls['view-procedure'].hidden,false);
+""",[])

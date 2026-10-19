@@ -12,7 +12,7 @@ from filelock import FileLock
 from autobookkeeping.archive import Archive, atomic, sha
 from autobookkeeping.dashboard import html, index_blob, index_catalog, projection
 
-CODE = ["scripts/build_bookkeeping_dashboard.py", "scripts/dashboard_view.html",
+CODE = ["scripts/build_bookkeeping_dashboard.py", "scripts/dashboard_view.html", "docs/verfahrensdokumentation.md",
         "scripts/bookkeeping_action.py", "scripts/publish_bookkeeping.py", "scripts/homeoffice.py",
         "scripts/receipt.py", "scripts/local_invoice.py", "scripts/bookkeeping_archive.py",
         "scripts/backup_register.py", "scripts/reconcile_ebay.py",
@@ -35,7 +35,7 @@ def build(repo: Path, staged=False, check=False, tool=None):
         changed = git(repo, "diff", "--cached", "--name-only", "-z").decode().split("\0")
         if any(n == ".env" or n.startswith(".env.") for n in changed):
             raise ValueError("Passwort-/Zugangsdaten dürfen nicht eingecheckt werden")
-        relevant = any(n in CODE or n in ("dashboard.html", "timestamp-status.json") or n.startswith("buchhaltung/") and not n.startswith("buchhaltung/nachweise/") and n not in ("buchhaltung/README.md", "buchhaltung/AGENTS.md") for n in changed)
+        relevant = any(n in CODE or n in ("dashboard.html", "timestamp-status.json", "verfahrensdokumentation.md") or n.startswith("buchhaltung/") and not n.startswith("buchhaltung/nachweise/") and n not in ("buchhaltung/README.md", "buchhaltung/AGENTS.md") for n in changed)
         if not relevant and not check:
             return {"skipped": True}
         from autobookkeeping.workspace import assert_tool_clean
@@ -53,7 +53,9 @@ def build(repo: Path, staged=False, check=False, tool=None):
     from autobookkeeping.timestamps import dashboard_status
     snapshot=projection(catalog,digest)
     snapshot['timestamps']=dashboard_status(repo,staged)
-    data = html(snapshot, template)
+    procedure=(tool/'docs/verfahrensdokumentation.md').read_bytes()
+    operating_present=bool(git(repo,'ls-files','--stage','--','verfahrensdokumentation.md').strip()) if staged else (repo/'verfahrensdokumentation.md').is_file()
+    data = html(snapshot, template, procedure, operating_present)
     existing = target.read_bytes() if target.exists() else None
     if check:
         if existing != data or staged and index_blob(repo, "dashboard.html") != data:

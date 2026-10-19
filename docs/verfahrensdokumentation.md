@@ -1,6 +1,6 @@
 # Verfahrensdokumentation der lokalen Belegablage
 
-Version 4 · Technikstand 08.10.2026, rechtliche Grundlagen zuletzt geprüft am 07.10.2026. Änderungen dieser Beschreibung werden mit der Toolhistorie versioniert. Die im privaten Workspace verwendete Toolrevision steht in `tool-version.json`.
+Version 5 · Technikstand 19.10.2026, rechtliche Grundlagen zuletzt geprüft am 07.10.2026. Änderungen dieser Beschreibung werden mit der Toolhistorie versioniert. Die im privaten Workspace verwendete Toolrevision steht in `tool-version.json`.
 
 ## 1. Allgemeine Beschreibung
 
@@ -133,6 +133,18 @@ CSV verwendet UTF-8, Semikolon, vollständig eingeschlossene Felder, doppelte An
 ## 4. Betriebsdokumentation
 
 ### Kontrollen und Verantwortlichkeit
+
+Die allgemeine Verfahrensbeschreibung wird bei jeder Dashboard-Erzeugung vollständig
+in den Reiter „Verfahrensdoku“ eingebettet, mit Inhaltsverzeichnis, Versionsangabe
+und SHA-256 der Quelldatei. Sie ist auch ohne Toolordner oder Internet lesbar.
+Der Commit-Hook berücksichtigt die Dokumentation als Generatorquelle und prüft
+den zum Commit passenden Stand; nicht vorgemerkte Quellenänderungen werden
+abgewiesen. Die private betriebliche Ergänzung wird separat verlinkt, ihr Inhalt
+aber nicht ins anonymisierte HTML übernommen. Der Link öffnet den lokalen
+Dateistand, keinen eingebetteten historischen Snapshot. Bei fehlender Ergänzung
+zeigt das Dashboard den offenen Einrichtungsbedarf. Die bloße Existenz der Datei
+belegt weder ausgefüllte Verantwortlichkeiten noch durchgeführte Kontrollen.
+Externe Rechtsquellen werden als Links dargestellt und nicht automatisch geladen.
 
 Das statische Dashboard trennt Übersicht, Belegverzeichnis und Kontrollen/Änderungen.
 Es verarbeitet ausschließlich die bereits erlaubten anonymisierten Snapshotfelder

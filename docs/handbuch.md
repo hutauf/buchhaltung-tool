@@ -47,8 +47,9 @@ Das Offline-Dashboard zeigt den letzten API-Abgleich, monatlichen Sicherungsbeda
 
 ## Dashboard bedienen
 
-`daten/dashboard.html` lässt sich direkt per Doppelklick öffnen. Die drei
-Arbeitsbereiche **Übersicht**, **Belege** und **Kontrollen & Änderungen** bleiben
+`daten/dashboard.html` lässt sich direkt per Doppelklick öffnen. Die vier
+Arbeitsbereiche **Übersicht**, **Belege**, **Kontrollen & Änderungen** und
+**Verfahrensdoku** bleiben
 vollständig offline. Die Übersicht zeigt erfasste Zahlungen, Monats-/Jahresverlauf,
 kumulierten Einnahmenüberschuss, Ausgabenkategorien und die Zusammensetzung des
 Belegbestands. Eine Grafik, Kategorie oder Prüfzahl anklicken, um die Auswahl
@@ -89,6 +90,16 @@ Filter und Vorschauen speichern keine Buchungen oder Prüfprotokolle. Neue
 Archivdaten werden erst nach erneuter Dashboard-Erzeugung angezeigt.
 
 ## Technische Protokolle und Prüfexport
+
+Die Verfahrensdokumentation steht vollständig im Dashboard-Reiter
+**Verfahrensdoku**, mit Inhaltsverzeichnis und Quellenprüfsumme. Ihr Stand wird
+beim Erzeugen und durch den Commit-Hook aus `docs/verfahrensdokumentation.md`
+übernommen; nach einem Toolupdate das Dashboard neu erzeugen. Die private
+`daten/verfahrensdokumentation.md` ist dort direkt verlinkt. Diese betriebliche
+Ergänzung muss tatsächlich ausgefüllt und mit den realen Abläufen aktuell gehalten
+werden. Ihre möglicherweise persönlichen Inhalte werden nicht ins Dashboard
+eingebettet; der Link zeigt die aktuelle lokale Datei. Fehlende Ergänzungen
+bleiben im Dashboard ausdrücklich als offen gekennzeichnet.
 
 Katalogänderungen werden automatisch in einem verschlüsselten, verketteten Änderungsprotokoll gespeichert. Vorherige Werte, Änderungszeitpunkt und Toolrevision bleiben prüfbar. Vorhandene Originaldateien und ihre Inventar-Prüfsummen dürfen die Helfer nicht überschreiben oder entfernen. Die Veröffentlichung speichert außerdem die tatsächlich bestandene technische Archivprüfung. Das belegt keinen vollständigen Quellenabgleich.
 

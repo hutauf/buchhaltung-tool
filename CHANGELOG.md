@@ -2,6 +2,11 @@
 
 ## Unveröffentlicht
 
+- Eigener Dashboard-Reiter „Verfahrensdoku“ mit vollständig eingebetteter
+  allgemeiner Beschreibung, Inhaltsverzeichnis und Quellenprüfsumme. Die private
+  betriebliche Ergänzung bleibt separat verlinkt; Dokumentation ist Bestandteil
+  der deterministischen Dashboard- und Commit-Prüfung.
+
 - Dashboard mit drei Arbeitsbereichen, klickbaren Monats-/Jahresgrafiken,
   Ausgabenkategorien, kumuliertem Einnahmenüberschuss und Bestandszusammenfassung.
   Erweiterte Filter, entfernbare Filterchips, Schnellansichten für Prüfbedarf und
