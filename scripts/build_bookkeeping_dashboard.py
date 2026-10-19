@@ -35,7 +35,11 @@ def build(repo: Path, staged=False, check=False, tool=None):
         changed = git(repo, "diff", "--cached", "--name-only", "-z").decode().split("\0")
         if any(n == ".env" or n.startswith(".env.") for n in changed):
             raise ValueError("Passwort-/Zugangsdaten dürfen nicht eingecheckt werden")
-        relevant = any(n in CODE or n in ("dashboard.html", "timestamp-status.json", "verfahrensdokumentation.md") or n.startswith("buchhaltung/") and not n.startswith("buchhaltung/nachweise/") and n not in ("buchhaltung/README.md", "buchhaltung/AGENTS.md") for n in changed)
+        # Setup commits the operating document before the encrypted archive exists.
+        # Once a database is staged, operating-document changes rebuild the view.
+        operating_change = "verfahrensdokumentation.md" in changed and bool(
+            git(repo, 'ls-files', '--stage', '--', 'buchhaltung/database.json.enc').strip())
+        relevant = operating_change or any(n in CODE or n in ("dashboard.html", "timestamp-status.json") or n.startswith("buchhaltung/") and not n.startswith("buchhaltung/nachweise/") and n not in ("buchhaltung/README.md", "buchhaltung/AGENTS.md") for n in changed)
         if not relevant and not check:
             return {"skipped": True}
         from autobookkeeping.workspace import assert_tool_clean

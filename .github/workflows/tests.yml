@@ -22,9 +22,13 @@ jobs:
       - name: Fresh setup and restore with synthetic data
         run: python scripts/release_smoke.py --output "${{ runner.temp }}/bookkeeping-release-smoke"
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: release-smoke-${{ matrix.os }}-${{ matrix.python }}
-          path: ${{ runner.temp }}/bookkeeping-release-smoke/report.json
+          path: |
+            ${{ runner.temp }}/bookkeeping-release-smoke/report.json
+            ${{ runner.temp }}/bookkeeping-release-smoke/test.log
+          if-no-files-found: ignore
       - name: Check public history and identity
         if: always()
         run: python scripts/audit_public_repo.py --name "hutauf" --email "13893694+hutauf@users.noreply.github.com"

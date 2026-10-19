@@ -2,6 +2,10 @@
 
 ## Unveröffentlicht
 
+- Erstkonfiguration mit betrieblicher Dokumentation lässt sich wieder vor der
+  Archivinitialisierung committen. CI bewahrt auch bei fehlgeschlagenem
+  Neueinrichtungs-/Wiederherstellungstest das synthetische Diagnoseprotokoll auf.
+
 - Zwei ältere Datenschutz-Testvorlagen an den zusätzlichen Verfahrensplatzhalter
   angepasst; die strenge Dashboard- und Datenschutzprüfung bleibt erhalten.
 

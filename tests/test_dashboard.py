@@ -362,6 +362,16 @@ def test_private_operating_contents_never_enter_dashboard(staged_repo):
     assert b'href="verfahrensdokumentation.md"' not in (repo/'dashboard.html').read_bytes()
 
 
+def test_initial_operating_document_commit_precedes_archive_initialization(tmp_path):
+    repo=tmp_path/'data';repo.mkdir()
+    def git(*args):return subprocess.check_output(['git','-C',str(repo),*args],stderr=subprocess.PIPE)
+    git('init')
+    (repo/'verfahrensdokumentation.md').write_text('Synthetic initial operating document',encoding='utf8')
+    git('add','verfahrensdokumentation.md')
+    assert SCRIPT['build'](repo,tool=repo,staged=True)=={'skipped':True}
+    assert not (repo/'dashboard.html').exists()
+
+
 def test_procedure_renderer_escapes_html_and_keeps_links_passive():
     from autobookkeeping.dashboard import procedure_document
     from bs4 import BeautifulSoup
