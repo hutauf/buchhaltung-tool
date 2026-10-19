@@ -24,7 +24,8 @@ def secret(label):
 def run(command):
     root=data_root();path=root/'.env';archive=Archive(root)
     if command=='einrichten':
-        assert_data_repo(root,remote=True)
+        # README configures the password before the first commit/upstream exists.
+        assert_data_repo(root,remote=True,require_upstream=False)
         if archive.key_path.exists(): raise WorkflowError('Archiv existiert bereits. Passwort nicht durch Ändern der .env ersetzen; mit passwort pruefen testen.')
         from dotenv import dotenv_values,set_key
         if dotenv_values(path).get('ENCRYPTION_PASSWORD'): raise WorkflowError('Passwort bereits hinterlegt. Wert erhalten; kein Passwort überschrieben.')

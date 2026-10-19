@@ -2,6 +2,9 @@
 
 ## Unveröffentlicht
 
+- Passwort-Einrichtung ist bereits vor dem ersten Datencommit möglich; das
+  freigegebene private Ziel wird auch ohne vorhandenen Upstream geprüft.
+
 - Manuelle Ersatzrechnungen nach vollständigem Storno bleiben explizit mit dem
   Original verknüpft und erzeugen keinen zusätzlichen Zahlungseingang.
 

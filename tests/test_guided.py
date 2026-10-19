@@ -80,3 +80,22 @@ def test_password_never_falls_back_to_echoed_terminal_input(monkeypatch):
         raise AssertionError('Must abort before asking with visible input')
     monkeypatch.setattr(module['getpass'],'getpass',no_echo)
     with pytest.raises(WorkflowError,match='verdeckt'):module['secret']('Synthetic prompt')
+
+
+def test_password_setup_works_before_first_commit_with_real_repository_guards(tmp_path,monkeypatch):
+    import subprocess
+    bare=tmp_path/'synthetic-private.git';repo=tmp_path/'data'
+    def git(*args):return subprocess.check_output(['git',*map(str,args)],stderr=subprocess.PIPE)
+    git('init','--bare',bare);git('init',repo);git('-C',repo,'remote','add','origin',bare)
+    (repo/'.bookkeeping-data.json').write_bytes(encoded({'version':1,'role':'data'}))
+    (repo/'workspace.json').write_bytes(encoded({'version':1,'expected_push_url':str(bare)}))
+    (repo/'.gitignore').write_text('.env\n')
+    module=runpy.run_path(str(ROOT/'scripts/password.py'))
+    module['run'].__globals__['data_root']=lambda:repo
+    inputs=iter(['synthetic-initial-password','synthetic-initial-password'])
+    monkeypatch.setattr(module['getpass'],'getpass',lambda _:next(inputs))
+    monkeypatch.setattr('builtins.input',lambda _:'GESICHERT')
+    assert module['run']('einrichten')['ok']
+    assert not (repo/'buchhaltung/key.json').exists()
+    assert '.env' in git('-C',repo,'check-ignore','.env').decode()
+    with pytest.raises(subprocess.CalledProcessError):git('-C',repo,'rev-parse','--verify','HEAD')
