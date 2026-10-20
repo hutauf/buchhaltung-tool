@@ -17,7 +17,7 @@ CODE = ["scripts/build_bookkeeping_dashboard.py", "scripts/dashboard_view.html",
         "scripts/receipt.py", "scripts/local_invoice.py", "scripts/bookkeeping_archive.py", "scripts/password.py",
         "scripts/backup_register.py", "scripts/reconcile_ebay.py",
         *["src/autobookkeeping/"+name+".py" for name in
-        ("__init__", "guided", "diagnostics", "workspace", "repository_privacy", "archive", "audit_trail", "inspection_export", "backups", "reconciliation", "checklist", "handover", "dashboard", "adjustments", "cashflow", "local_invoices", "taxes", "ledger_validation", "receipts", "einvoices", "retention", "homeoffice", "publication", "timestamps", "models")]]
+        ("__init__", "password_check", "guided", "diagnostics", "workspace", "repository_privacy", "archive", "audit_trail", "inspection_export", "backups", "reconciliation", "checklist", "handover", "dashboard", "adjustments", "cashflow", "local_invoices", "taxes", "ledger_validation", "receipts", "einvoices", "retention", "homeoffice", "publication", "timestamps", "models")]]
 
 
 def git(repo, *args):
@@ -48,7 +48,8 @@ def build(repo: Path, staged=False, check=False, tool=None):
             for name in CODE:
                 if git(repo, "hash-object", name).strip() != git(repo, "rev-parse", ":"+name).strip():
                     raise ValueError("Dashboard-Helfer enthält nicht vorgemerkte Änderungen: " + name)
-        catalog, digest = index_catalog(repo)
+        archive=Archive(repo)
+        catalog, digest = index_catalog(repo,archive=archive)
         template = (tool / "scripts/dashboard_view.html").read_bytes()
     else:
         archive = Archive(repo); archive.verify(); catalog = archive.catalog()
@@ -57,6 +58,9 @@ def build(repo: Path, staged=False, check=False, tool=None):
     from autobookkeeping.timestamps import dashboard_status
     snapshot=projection(catalog,digest)
     snapshot['timestamps']=dashboard_status(repo,staged)
+    from autobookkeeping.password_check import descriptor
+    wrapper=index_blob(repo,'buchhaltung/key.json') if staged else archive.key_path.read_bytes()
+    snapshot['password_check']=descriptor(archive.password,wrapper)
     procedure=(tool/'docs/verfahrensdokumentation.md').read_bytes()
     operating_present=bool(git(repo,'ls-files','--stage','--','verfahrensdokumentation.md').strip()) if staged else (repo/'verfahrensdokumentation.md').is_file()
     data = html(snapshot, template, procedure, operating_present)

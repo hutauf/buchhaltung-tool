@@ -12,28 +12,62 @@ ROOT=Path(__file__).resolve().parents[1]
 SCRIPT=runpy.run_path(str(ROOT/"scripts/build_bookkeeping_dashboard.py"))
 
 
-def test_password_reminder_only_persists_timestamp_and_is_skippable():
+def test_password_check_matches_real_webcrypto_and_remembers_only_success():
+    from autobookkeeping.password_check import descriptor
+    from autobookkeeping.archive import wrapped_key
     node=shutil.which('node')
     if not node: pytest.skip('Node required')
+    password='SYNTHETIC-memory-password-ä-ß'
+    check=descriptor(password,wrapped_key(b'x'*32,password))
     source=(ROOT/'scripts/dashboard_view.html').read_text(encoding='utf8')
-    script=source.split('function reminderRecent')[1].split("$('basis').textContent")[0]
-    script='function reminderRecent'+script
+    script='function reminderRecent'+source.split('function reminderRecent')[1].split("$('overview-to-homeoffice').onclick")[0]
     program=r"""
 const vm=require('vm'),fs=require('fs'),assert=require('assert'),controls={},stored={};
+const input=JSON.parse(fs.readFileSync(0,'utf8'));
 const $=id=>controls[id]||(controls[id]={value:'',addEventListener(){}});
-const context={$,showView(){},localStorage:{getItem:k=>stored[k],setItem:(k,v)=>stored[k]=v}};
-vm.createContext(context);vm.runInContext(JSON.parse(fs.readFileSync(0,'utf8')),context);
-assert.strictEqual($('password-reminder').hidden,false);
-$('memory-password').value='SYNTHETIC-SECRET';$('memory-confirm').onclick();
-assert.strictEqual($('memory-password').value,'');assert.strictEqual($('password-reminder').hidden,true);
-assert.strictEqual(Object.keys(stored).length,1);assert(/^\d+$/.test(Object.values(stored)[0]));
-assert(!JSON.stringify(stored).includes('SYNTHETIC-SECRET'));
-$('memory-password').value='SYNTHETIC-OTHER';$('memory-skip').onclick();assert.strictEqual($('memory-password').value,'');
-assert.strictEqual(vm.runInContext('reminderRecent(Date.now()+1000)',context),false);
-assert.strictEqual(vm.runInContext('reminderRecent(Date.now()-86400001)',context),false);
+const context={$,DATA:{password_check:input.check},crypto:require('crypto').webcrypto,TextEncoder,
+ localStorage:{getItem:k=>stored[k],setItem:(k,v)=>stored[k]=v}};
+stored['bookkeeping.password.reminder.v1']=String(Date.now());
+vm.createContext(context);vm.runInContext(input.script,context);
+(async()=>{
+ assert.strictEqual($('password-reminder').hidden,false);
+ delete stored['bookkeeping.password.reminder.v1'];
+ $('memory-password').value='SYNTHETIC-WRONG';await $('memory-confirm').onclick();
+ assert.strictEqual($('password-reminder').hidden,false);assert.strictEqual($('memory-password').value,'');
+ assert.strictEqual(Object.keys(stored).length,0);assert($('memory-result').textContent.includes('stimmt nicht'));
+ assert.strictEqual($('memory-confirm').disabled,false);
+ $('memory-password').value=input.password;await $('memory-confirm').onclick();
+ assert.strictEqual($('password-reminder').hidden,true);assert.strictEqual($('memory-password').value,'');
+ assert.strictEqual(Object.keys(stored).length,1);assert(/^\d+$/.test(Object.values(stored)[0]));
+ assert(Object.keys(stored)[0].includes(input.check.salt));assert(!JSON.stringify(stored).includes(input.password));
+ assert.strictEqual(vm.runInContext('reminderRecent(Date.now()+1000)',context),false);
+ assert.strictEqual(vm.runInContext('reminderRecent(Date.now()-86400001)',context),false);
+ for(const key of Object.keys(stored))delete stored[key];
+ $('open-password-help').onclick();$('memory-password').value=input.password;
+ const pending=$('memory-confirm').onclick();$('memory-skip').onclick();await pending;
+ assert.strictEqual(Object.keys(stored).length,0);assert.strictEqual($('memory-password').value,'');
+ context.crypto=undefined;$('open-password-help').onclick();$('memory-password').value=input.password;
+ await $('memory-confirm').onclick();assert.strictEqual(Object.keys(stored).length,0);
+ assert.strictEqual($('password-reminder').hidden,false);assert($('memory-result').textContent.includes('nicht verfügbar'));
+ $('memory-skip').onclick();assert.strictEqual($('password-reminder').hidden,true);
+})().catch(e=>{console.error(e);process.exitCode=1;});
 """
-    subprocess.run([node,'-e',program],input=json.dumps(script).encode(),capture_output=True,check=True,timeout=15)
-    assert 'nicht geprüft' in source and 'Passwortschutz' in source
+    subprocess.run([node,'-e',program],input=json.dumps({'script':script,'check':check,'password':password}).encode(),
+                   capture_output=True,check=True,timeout=30)
+    assert 'Gib das Passwort aus deiner Erinnerung ein.' in source
+    assert 'Hier wird es <strong>nicht geprüft</strong>' not in source
+
+
+def test_password_descriptor_is_stable_archive_specific_and_contains_no_password():
+    from autobookkeeping.password_check import descriptor
+    from autobookkeeping.archive import wrapped_key
+    password='SYNTHETIC-password-for-browser'
+    wrapper=wrapped_key(b'x'*32,password)
+    check=descriptor(password,wrapper)
+    assert check==descriptor(password,wrapper)
+    assert check['salt']!=descriptor(password,wrapped_key(b'x'*32,password))['salt']
+    assert check['digest']!=descriptor(password+'different',wrapper)['digest']
+    assert password not in json.dumps(check) and len(check['digest'])==64 and check['iterations']==2100000
 
 
 def test_backup_actions_target_the_medium_named_by_restore_warning():
@@ -86,9 +120,17 @@ def test_staged_snapshot_ignores_unstaged_database_and_is_deterministic(staged_r
     SCRIPT["build"](repo,tool=repo,staged=True)
     snapshot=json.loads((repo/"dashboard.html").read_text(encoding="utf8").split('<script id="bookkeeping-data" type="application/json">')[1].split('</script>')[0])
     assert snapshot["source_sha256"]==staged_digest and snapshot["rows"][0]["gross_cents"]==13000
+    from autobookkeeping.password_check import descriptor
+    assert snapshot['password_check']==descriptor(archive.password,git('show',':buchhaltung/key.json'))
+    assert archive.password.encode() not in (repo/'dashboard.html').read_bytes()
     first=(repo/"dashboard.html").read_bytes();SCRIPT["build"](repo,tool=repo,staged=True,check=True)
     assert (repo/"dashboard.html").read_bytes()==first
     assert git("diff","--name-only","--","buchhaltung").strip()
+    from autobookkeeping.archive import atomic,wrapped_key
+    atomic(archive.key_path,wrapped_key(b'z'*32,archive.password))
+    # A working-tree key change must not alter a verifier for the staged archive.
+    SCRIPT['build'](repo,tool=repo,staged=True,check=True)
+    assert (repo/'dashboard.html').read_bytes()==first
 
 
 def test_incomplete_index_plaintext_and_manual_html_are_blocked(staged_repo):

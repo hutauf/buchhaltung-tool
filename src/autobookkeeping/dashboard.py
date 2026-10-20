@@ -193,8 +193,8 @@ def index_blob(repo:Path,name:str)->bytes:
     return subprocess.check_output(["git","-C",str(repo),"show",":"+name],stderr=subprocess.PIPE)
 
 
-def index_catalog(repo:Path)->tuple[dict,str]:
-    archive=Archive(repo)
+def index_catalog(repo:Path, archive=None)->tuple[dict,str]:
+    archive=archive or Archive(repo)
     key=unwrap_key(index_blob(repo,"buchhaltung/key.json"),archive.password)
     database=index_blob(repo,"buchhaltung/database.json.enc")
     catalog=json.loads(unseal(key,database,"database.json.enc"))

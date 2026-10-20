@@ -2,6 +2,12 @@
 
 ## Unveröffentlicht
 
+- Dashboard prüft das erinnerte Passwort jetzt tatsächlich offline: archivbezogener
+  Salt, PBKDF2-HMAC-SHA256 mit 2.100.000 Iterationen, Fehlermeldung bei falscher
+  Eingabe und 24-Stunden-Bestätigung ausschließlich nach Erfolg. Kein Passwort
+  wird gespeichert oder übertragen; Überspringen bleibt möglich. Alte ungeprüfte
+  Bestätigungen gelten nicht weiter. Verfahrensbeschreibung Version 8.
+
 - Passwort-Einrichtung ist bereits vor dem ersten Datencommit möglich; das
   freigegebene private Ziel wird auch ohne vorhandenen Upstream geprüft.
 
@@ -11,7 +17,7 @@
 - Geführte Beleg-, Zahlungs-, Korrektur- und Profilerfassung ohne selbst erstellte
   JSON-Dateien; manuelle Rechnungsentwürfe ohne externe Dienste. Vine optional,
   konfigurierte Fehler werden weiterhin gemeldet. Freigaben bleiben getrennt.
-- Überspringbare Passwort-Erinnerung ohne Passwort/Hash im HTML, lokale verdeckte
+- Überspringbare Passwort-Prüfung im Browser, lokale verdeckte
   Schlüsselprüfung und Einrichtung mit unabhängiger Passwortsicherung.
 - Sichere verständliche Fehlermeldungen, Hinweise zur Wiederaufnahme, passende
   Restore-Befehle je Sicherung und unverbindliche Sicherungsempfehlungen.
