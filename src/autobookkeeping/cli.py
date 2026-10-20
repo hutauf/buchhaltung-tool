@@ -17,6 +17,7 @@ ROUTES = {
     "abgleich": ("reconcile_ebay.py", [], "Vollstaendiger eBay-Verkaufsabgleich ohne Gebuehrenimport"),
     "verfahrensdoku": ("procedure.py", [], "Betriebliche Abläufe beschreiben und privat versionieren"),
     "jahresbericht": ("annual_report.py", [], "Jahresübersicht mit vollständigem Archiv außerhalb exportieren"),
+    "datev": ("datev_export.py", [], "DATEV-CSV mit Begleitbericht ausschließlich exportieren"),
     "veroeffentlichen": ("publish_bookkeeping.py", [], "Git-/Zeitnachweis-Pipeline pruefen und fortsetzen"),
     "homeoffice": ("homeoffice.py", [], "Homeoffice-Tage pruefen und nach Freigabe speichern"),
     "ebay": ("get_ebay_orders.py", [], "eBay-Bestellungen lesen"),

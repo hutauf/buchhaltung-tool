@@ -50,6 +50,7 @@ def projection(catalog: dict, source_digest: str) -> dict:
     from autobookkeeping.backups import public_status as backup_status
     from autobookkeeping.reconciliation import public_status as reconcile_status
     from autobookkeeping.procedure import public_status as procedure_status
+    from autobookkeeping.datev_export import projection as datev_projection
     rows=[]
     values=[("records", v["current"]) for v in catalog["records"].values()]
     values += [(section, v["current"]) for section in ("local_invoice_drafts","local_adjustment_drafts","local_expense_drafts")
@@ -113,6 +114,7 @@ def projection(catalog: dict, source_digest: str) -> dict:
     return {"schema_version":1,"source_sha256":source_digest,"timezone":"Europe/Berlin","currency":"EUR",
             "backups":backup_status(catalog), "reconciliation":reconcile_status(catalog),
             "operating_procedure": procedure_status(catalog),
+            "datev_export": datev_projection(catalog),
             "retention":public_retention(catalog),
             "basis":"Erfasste Zahlungsbewegungen; Belegbeträge getrennt. Arbeitsübersicht, keine vollständige steuerliche EÜR.",
             "gaps":["Erfasste Verkäufe mit eBay-API abgleichen; tatsächliche Zahlungsverfügbarkeit gesondert prüfen. Kein automatischer Gebührenimport.",

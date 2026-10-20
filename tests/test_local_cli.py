@@ -26,6 +26,7 @@ from autobookkeeping.local_invoices import WorkflowError
     (['abgleich','faelle'],'reconcile_ebay.py',['faelle']),
     (['verfahrensdoku','fragen'],'procedure.py',['fragen']),
     (['jahresbericht','--year','2011','--output','outside'],'annual_report.py',['--year','2011','--output','outside']),
+    (['datev','--year','2026','--advisor','1234','--client','7','--output','outside'],'datev_export.py',['--year','2026','--advisor','1234','--client','7','--output','outside']),
     (['sicherung','wiederherstellen','outside'],'restore_backup.py',['outside']),
     (['veroeffentlichen','resume'],'publish_bookkeeping.py',['resume']),
 ])
@@ -54,7 +55,7 @@ def test_version_matches_project_metadata(capsys):
     assert caught.value.code == 0 and __version__ in capsys.readouterr().out
 
 
-@pytest.mark.parametrize('group',['rechnung','beleg','archiv','pruefen','dashboard','homeoffice','veroeffentlichen','zahlung','sicherung','verfahrensdoku','jahresbericht'])
+@pytest.mark.parametrize('group',['rechnung','beleg','archiv','pruefen','dashboard','homeoffice','veroeffentlichen','zahlung','sicherung','verfahrensdoku','jahresbericht','datev'])
 def test_help_in_a_clean_checkout_without_data(tmp_path,group):
     source=Path(__file__).resolve().parents[1];tool=tmp_path/'tool'
     shutil.copytree(source/'src',tool/'src');shutil.copytree(source/'scripts',tool/'scripts')

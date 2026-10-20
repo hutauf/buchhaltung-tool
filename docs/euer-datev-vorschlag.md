@@ -1,7 +1,8 @@
 # Vorschlag: Anlage EÜR und DATEV
 
-Recherche vom 20.10.2026. Dies ist ein fachlicher Entwicklungsvorschlag zur
-Besprechung, keine aktive Formularzuordnung und kein vorhandener DATEV-Export.
+Stand 21.10.2026. Die amtliche EÜR-Feldzuordnung bleibt ein fachlicher Vorschlag
+zur Besprechung. Der [DATEV-Export für 2026](datev-export.md) ist inzwischen vorhanden;
+er ist von einer abgabefertigen amtlichen EÜR zu unterscheiden.
 Der bestehende Jahresbericht wertet die tatsächlich erfassten Daten aus und
 enthält den vollständigen Original-/JSON-/CSV-Export.
 
@@ -60,19 +61,14 @@ Eine EÜR setzt beim Nutzer keine doppelte Buchführung voraus. Der hier untersu
 DATEV-Buchungsstapel verlangt jedoch technisch Konto, Gegenkonto und Soll/Haben.
 Die Schnittstellenanforderung ist von unserer einfachen Aufzeichnung zu trennen.
 
-Ohne Kontenzuordnung kann dieses konkrete DATEV-Format nicht als gültiger
-Buchungsstapel erzeugt werden. Ein Exportadapter könnte später die vorhandenen
-Kategorien auf die Anforderungen der empfangenden Kanzlei abbilden, während der
-Nutzer weiterhin nur Einnahmen/Ausgaben erfasst. Jetzt wird kein Kontenrahmen
-in die Anwendung eingeführt. Ebenso ist kein allgemein unterstützter externer
-Import bloßer EÜR-Zeilensummen in DATEV EÜR Steuern nachgewiesen; unsere normale
-CSV darf deshalb nicht als unmittelbar DATEV-importierbar bezeichnet werden.
-
-Vorrang hat die kategorisierte EÜR-Übersicht für Kleinunternehmer mit nachvollziehbaren
-Belegreferenzen. Für einen späteren DATEV-Adapter werden Zielanwendung und deren
-Importprofil konkret abgestimmt und mit einem echten Import geprüft.
-DATEV weist selbst darauf hin, dass eine reine Headerprüfung keine vollständige
-Dateivalidierung ist: [Schnittstellenvorgaben](https://developer.datev.de/de/product-detail/accounting-extf-files/2.0/documentation/interface-requirements-file).
+Der [DATEV-Exportadapter](datev-export.md) nutzt jetzt ein festgelegtes SKR03-EÜR-Profil
+für 2026 und das neutrale EÜR-Verrechnungskonto 1371. Die Anwendung selbst bleibt
+bei Einnahmen-/Ausgabenkategorien. Im Dashboard entstehen DATEV-CSV und ein
+Begleitbericht als ZIP, ohne Datenbuchung. Echte Zielnummern des Empfängers werden
+im Dialog eingegeben; sie werden nicht geraten. Bekannte Ausnahmen werden separat
+ausgewiesen. Ein Import bloßer EÜR-Zeilensummen in DATEV EÜR Steuern wird weiterhin
+nicht behauptet. Vorhanden sind lokaler Formatprüfer und Browser-/CLI-Vergleich;
+ein echter Importtest in DATEV ist nicht erfolgt.
 
 ## Fachliche Grenzen
 
