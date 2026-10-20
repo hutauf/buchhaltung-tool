@@ -5,6 +5,12 @@ Besprechung, keine aktive Formularzuordnung und kein vorhandener DATEV-Export.
 Der bestehende Jahresbericht wertet die tatsächlich erfassten Daten aus und
 enthält den vollständigen Original-/JSON-/CSV-Export.
 
+Der geplante Ablauf ist eine einfache Einnahmen-/Ausgabenaufzeichnung für
+Kleinunternehmer nach § 19 UStG. Nutzer verwalten Kategorien und EÜR-Positionen,
+keinen Kontenrahmen. Neue eigene Rechnungen mit Regelbesteuerung sind gesperrt.
+Amazon-/Vine-Produkttester-Leistungsumsätze, insbesondere ausgehende
+Reverse-Charge-Umsätze, werden vorerst nicht aufgenommen.
+
 ## Amtliches Formular als Ziel
 
 Grundlage für 2026 ist die [amtliche Anlage EÜR 2026 samt Anleitungen,
@@ -19,16 +25,12 @@ verdeutlichen, warum Formularjahr und fachliche Kennung getrennt zu führen sind
 |---|---|---|
 | Betrieb und Person | Allgemeine Angaben, Betriebsart, Rechtsform, Einkunftsart, Inhaber, Wirtschaftsjahr und Steuer-/Wirtschafts-ID | Private Stammdaten; kein Bestandteil des anonymisierten Dashboards |
 | Vereinnahmte Kleinunternehmer-Verkäufe | Zeile 12, Kennzahl 111, tatsächlicher Gesamtzufluss | Steuerstatus im jeweiligen Leistungszeitraum und weitere Einnahmen; Stornos ohne Rückzahlung nicht pauschal abziehen |
-| Regelbesteuerte Verkäufe | Zeile 15, Kennzahl 112, netto; vereinnahmte Umsatzsteuer getrennt Zeile 17, Kennzahl 140 | Teilzahlungen und zugehörige Steueranteile; bestehende Bruttosumme reicht nicht |
-| Steuerfreie/nicht steuerbare Einnahmen und Leistungen mit Steuerschuld des Empfängers | Zeile 16, Kennzahl 103 | Diese Fälle ausdrücklich unterscheiden; nicht allein aus einem Steuersatz von null ableiten |
-| Software-Abos | Laufende EDV-Kosten, Zeile 51, Kennzahl 228, als Ausgangsvorschlag | Laufender Aufwand versus Anschaffung/Lizenz; betrieblicher Anteil; ausländische Leistung/Reverse Charge separat |
+| Software-Abos | Laufende EDV-Kosten, Zeile 51, Kennzahl 228, als Ausgangsvorschlag | Laufender Aufwand versus Anschaffung/Lizenz; betrieblicher Anteil; ausländische Eingangsleistungen und Sondersteuern nicht automatisch verarbeiten |
 | Briefporto/Büromaterial | Arbeitsmittel, Zeile 52, Kennzahl 229 | Pakettransport gehört gegebenenfalls zur anderen Position; die jetzige Kategorie `postage` reicht zur Entscheidung nicht |
 | Paketversand und Verpackung | Verpackung/Transport, Zeile 54, Kennzahl 227 | Art des Belegs und tatsächlicher betrieblicher Aufwand |
 | Eingereichte Marktplatzkosten | Zuordnung nach konkreter Leistung: insbesondere Werbung oder übrige Betriebsausgaben als Vorschlag | Nicht jede Plattformgebühr ist dieselbe Leistung; keine automatische Zuordnung und kein Abrechnungsimport |
 | Waren und unmittelbare Nebenkosten | Zeile 29, Kennzahl 100 | Abgrenzung zu Anlagevermögen, Privatnutzung und Spezialfällen |
 | Homeoffice-Tagespauschale | Zeile 67, Kennzahl 163 | Bestätigte berechtigte Tage, Höchstbetrag und Ausschluss anderweitiger Doppelansätze; kein Geldabfluss |
-| Abziehbare bezahlte Vorsteuer | Zeile 58, Kennzahl 185 | Nur bei bestehender Abzugsberechtigung; nicht einfach alle Belegsteuern summieren |
-| Umsatzsteuer an/vom Finanzamt | Ausgaben Zeile 59, Kennzahl 186; Erstattungen Zeile 18, Kennzahl 141 | Tatsächliche Zahlung/Verrechnung und gegebenenfalls Zehn-Tage-Regel |
 | Lieferanten-Erstattung | Bezug zur ursprünglichen Ausgabenposition als Zuordnungsvorschlag | Tatsächlicher Zufluss, Jahreswechsel und Umsatzsteuerfolgen |
 | Vine-Zugänge/Entnahmen, AfA, weitere Einnahmen/Ausgaben | Separater späterer Ausbau | Bewertung, Erfassungszeitpunkt und Vermeidung von Doppelansätzen gemeinsam besprechen |
 
@@ -37,7 +39,9 @@ Vorgänge → Herkunft und Betrag → noch ungeklärte Zuordnungen**. Nicht erfa
 Bereiche bleiben unbekannt, statt stillschweigend null zu werden. Die Ansicht
 heißt zunächst „EÜR-Zuordnungsvorschlag“. Eine Freigabe der gesamten Steuererklärung
 oder ELSTER-Übermittlung wird nicht behauptet. Reverse Charge wird erst nach
-fachlicher Abstimmung umgesetzt; auch Kleinunternehmer können dabei betroffen sein.
+fachlicher Abstimmung für Produkttester-Leistungsumsätze erweitert. Diese Einnahmen
+bleiben jetzt außerhalb des Tools. Eingangsbelege behalten ihre ausgewiesenen
+Steuerangaben; daraus wird kein automatischer Vorsteuerabzug abgeleitet.
 
 ## DATEV ist technisch möglich
 
@@ -50,18 +54,25 @@ Buchungsfeldern. Dafür ist keine direkte Übertragung an einen DATEV-Webdienst 
 Öffentliche Dokumentation ist keine Zusage einer Open-Source-Lizenz für DATEV-Produkte
 oder einer Zertifizierung unseres Exports.
 
-Für einen belastbaren Export fehlen zunächst fachlich bestätigte Konten und
-Steuerschlüssel: Kontenrahmen/Kontenlänge, Mandanten-/Beraternummer, Wirtschaftsjahr,
-Gegenkonten, Soll/Haben, Belegbezug, Erstattungen sowie Behandlung der Sonderfälle.
-Rechnungen und Zahlungen dürfen nicht versehentlich doppelte Erlöse erzeugen.
-Deshalb kein geratenes SKR03-/SKR04-Mapping einbauen.
+DATEV unterstützt auch die Gewinnermittlung per EÜR, siehe
+[DATEV EÜR Steuern](https://www.datev.de/web/de/berufsgruppenuebergreifend/service-und-support/umstellungen/auf-datev-euer-steuern).
+Eine EÜR setzt beim Nutzer keine doppelte Buchführung voraus. Der hier untersuchte
+DATEV-Buchungsstapel verlangt jedoch technisch Konto, Gegenkonto und Soll/Haben.
+Die Schnittstellenanforderung ist von unserer einfachen Aufzeichnung zu trennen.
 
-Vorgeschlagene Umsetzung nach fachlicher Abstimmung: privates Exportprofil,
-ausdrücklich unterstützte Fälle, gesonderte Liste aller nicht exportierbaren
-Vorgänge, neue Ausgabe außerhalb beider Repos und technischer Validatorlauf.
-Ein echter Importtest mit der empfangenden DATEV-Anwendung gehört vor eine
-Kompatibilitätszusage. DATEV weist selbst darauf hin, dass eine reine Headerprüfung
-keine vollständige Dateivalidierung ist: [Schnittstellenvorgaben](https://developer.datev.de/de/product-detail/accounting-extf-files/2.0/documentation/interface-requirements-file).
+Ohne Kontenzuordnung kann dieses konkrete DATEV-Format nicht als gültiger
+Buchungsstapel erzeugt werden. Ein Exportadapter könnte später die vorhandenen
+Kategorien auf die Anforderungen der empfangenden Kanzlei abbilden, während der
+Nutzer weiterhin nur Einnahmen/Ausgaben erfasst. Jetzt wird kein Kontenrahmen
+in die Anwendung eingeführt. Ebenso ist kein allgemein unterstützter externer
+Import bloßer EÜR-Zeilensummen in DATEV EÜR Steuern nachgewiesen; unsere normale
+CSV darf deshalb nicht als unmittelbar DATEV-importierbar bezeichnet werden.
+
+Vorrang hat die kategorisierte EÜR-Übersicht für Kleinunternehmer mit nachvollziehbaren
+Belegreferenzen. Für einen späteren DATEV-Adapter werden Zielanwendung und deren
+Importprofil konkret abgestimmt und mit einem echten Import geprüft.
+DATEV weist selbst darauf hin, dass eine reine Headerprüfung keine vollständige
+Dateivalidierung ist: [Schnittstellenvorgaben](https://developer.datev.de/de/product-detail/accounting-extf-files/2.0/documentation/interface-requirements-file).
 
 ## Fachliche Grenzen
 

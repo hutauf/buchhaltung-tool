@@ -70,7 +70,7 @@ def main() -> dict:
     p.add_argument("id"); p.add_argument("--revision", required=True); p.add_argument("--number", required=True)
     p.add_argument("--approved", action="store_true")
     p = sub.add_parser("tax-profile")
-    p.add_argument("--mode", choices=("small-business", "regular"), required=True)
+    p.add_argument("--mode", choices=("small-business",), required=True)
     p.add_argument("--reason", required=True); p.add_argument("--approved", action="store_true")
     p = sub.add_parser("cash-record")
     p.add_argument("--metadata", type=Path); p.add_argument('--interactive',action='store_true'); p.add_argument('--record-id')

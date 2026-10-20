@@ -261,3 +261,8 @@ Nach vollständigem Storno einer manuellen Rechnung kann mit derselben eigenen A
 - `buchhaltung jahresbericht --year 2026 --output NEUER_ORDNER_AUSSERHALB` erstellt `jahresbericht.html`, Jahreszahlungen als CSV, Zusammenfassung und den vollständigen Original-/JSON-/CSV-Export. Alle Archivjahre bleiben erhalten. Dieser Leseexport erzeugt keinen Commit und keinen neuen Zeitnachweis.
 - Betriebsprüfungen, steuerliche Prüfbescheide und die automatische Verknüpfung von Zahlungen mit archivierten Original-Zahlungsnachweisen sind außerhalb des Funktionsumfangs. Vorhandene textliche Zahlungsreferenzen bleiben erhalten.
 - [Erster Vorschlag zur Anlage EÜR 2026 und DATEV](euer-datev-vorschlag.md): amtliche Positionen, offene Zuordnungen und Voraussetzungen für einen späteren DATEV-Buchungsstapel. Noch kein DATEV-Export und keine abgabefertige Steuererklärung.
+
+
+## Fachlicher Umfang: Kleinunternehmer
+
+Neue eigene Rechnungen und der geplante EÜR-Zuordnungsvorschlag sind auf Kleinunternehmer nach § 19 UStG beschränkt. Der normale Ablauf verwendet Einnahmen-/Ausgabenkategorien, keinen Kontenrahmen. Regelbesteuerte neue Rechnungen sind technisch gesperrt. Vorhandene historische Originale und Steuern in eingehenden Ausgabenbelegen bleiben erhalten. Amazon-/Vine-Produkttester-Leistungsumsätze einschließlich ausgehender Reverse-Charge-Umsätze bleiben vorerst außerhalb des Umfangs. Ein DATEV-Buchungsstapel wäre ein gesonderter Adapter mit technischem Importmapping; es gibt derzeit keinen DATEV-Export.

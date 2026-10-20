@@ -2,6 +2,12 @@
 
 ## Unveröffentlicht
 
+- Umfang auf einfache Kleinunternehmer-Aufzeichnungen beschränkt; Vorbereitung
+  und Abschluss neuer eigener Rechnungen sperren Regelbesteuerung. EÜR-Vorschlag
+  entsprechend reduziert, Produkttester-Leistungsumsätze ausgenommen. DATEV als
+  möglicher gesonderter Exportadapter eingeordnet. Verfahrensbeschreibung Version 10.
+
+
 - Dauerhafte eBay-Abweichungsvermerke mit Originalbezug, Wiederöffnung und
   anonymisierter Dashboard-Anzeige; Storno-/Ersatzketten gesondert sichtbar.
 - Geführte private Betriebsdokumentation per Terminal oder Agenten-Prompt,

@@ -251,6 +251,8 @@ class Adjustments:
 
 
 def change_tax_profile(workflow, small_business, reason, approved):
+    if small_business is not True:
+        raise WorkflowError('Dieses Tool unterstützt neue eigene Rechnungen ausschließlich für Kleinunternehmer nach § 19 UStG')
     if not approved or not isinstance(reason,str) or not reason.strip():
         raise WorkflowError("Steuerprofilwechsel benötigt ausdrückliche Freigabe und geprüften Grund")
     workflow.archive.verify(); before=workflow.archive.catalog(); after=copy.deepcopy(before)

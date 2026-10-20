@@ -1,6 +1,7 @@
 # Buchhaltungswerkzeug
 
 - Mit dem Nutzer auf Deutsch arbeiten. Toolcode und Datenrepo sind unabhängig.
+- Eigene neue Rechnungen und die geplante EÜR-Auswertung ausschließlich für Kleinunternehmer nach § 19 UStG. Einfache Einnahmen-/Ausgabenaufzeichnung ohne Kontenrahmen im Nutzerablauf. Amazon-/Vine-Produkttester-Leistungsumsätze einschließlich Reverse-Charge-Umsätzen bleiben vorerst außerhalb des Umfangs; keine automatische Übernahme. Original-Steuerangaben vorhandener und eingehender Belege erhalten.
 - Keine Clients, Zugangskonfiguration, Importadapter oder Schreibskripte für frühere Rechnungsdienste in dieses Toolrepo aufnehmen. Historische importierte Belege dienstunabhängig im Speicher lesen; deren verschlüsselte Quellkennungen und Originale nicht umschreiben. `buchhaltung` startet ausschließlich die lokalen Helfer.
 - Neue Profile lokal aus einer geprüften externen Profildatei einrichten. Nummernübergaben aus einem geprüften lokalen Übergabebericht lesen; vollständigen Bestand, keine offenen externen Entwürfe, Nummernstand und Ende der externen Nummernvergabe ausdrücklich prüfen. Produktivwechsel und konkrete Rechnungsfreigabe bleiben getrennt.
 - Persönliche Daten ausschließlich unter `daten/` verarbeiten. Dieser Ordner ist im Toolrepo vollständig ignoriert und besitzt ein eigenes `.git`; kein Submodul und keine `.gitmodules` anlegen.

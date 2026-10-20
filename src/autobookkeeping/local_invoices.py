@@ -334,6 +334,8 @@ class LocalInvoices:
         config = after.get("local_invoice_settings")
         if not config:
             raise WorkflowError("Absenderprofil zuerst einrichten")
+        if config['seller'].get('small_business') is not True:
+            raise WorkflowError('Neue eigene Rechnungen sind nur für Kleinunternehmer nach § 19 UStG vorgesehen')
         if checks.get("invoice_matches") or checks.get("expense_matches"):
             raise WorkflowError("Prüfung meldet eine vorhandene Rechnung oder Ausgabe für diese Bestellung")
         self.check_duplicates(after, snapshot, replacement_of)
@@ -418,6 +420,8 @@ class LocalInvoices:
         if after["local_invoice_settings"]["mode"] != "local":
             raise WorkflowError("Probebetrieb: Produktivwechsel wurde noch nicht freigegeben")
         value = after["local_invoice_drafts"][invoice_id]; current = value["current"]
+        if current.get('small_business') is not True or after['local_invoice_settings']['seller'].get('small_business') is not True:
+            raise WorkflowError('Neue eigene Rechnungen sind nur für Kleinunternehmer nach § 19 UStG vorgesehen')
         if current["status"] != "test_draft" or current["revision"] != expected_revision:
             raise WorkflowError("Entwurf wurde geändert, verworfen oder bereits ausgestellt")
         manual = current.get('entry_source') == 'manual'

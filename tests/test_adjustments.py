@@ -53,12 +53,22 @@ def test_correction_number_original_immutability_and_stale_draft(workspace):
     with pytest.raises(WorkflowError): adjust.prepare(invoice["id"],"cancellation",{"reason":"Doppelt"})
 
 
-def test_mixed_tax_partial_refunds_caps_and_rounding(workspace):
+def test_historical_mixed_tax_partial_refunds_caps_and_rounding(workspace, tmp_path):
     archive,workflow,order,checks=workspace
-    change_tax_profile(workflow,False,"Synthetische Regelbesteuerung",True)
-    with pytest.raises(ValueError): workflow.prepare(order,checks)
-    with pytest.raises(ValueError): workflow.prepare(order,checks,rates=[0,0])
-    invoice=issued(workspace,[19,7]); adjust=Adjustments(workflow)
+    # Preserve historical tax information without enabling new regular-tax invoices.
+    from autobookkeeping.archive import encoded
+    from autobookkeeping.local_invoices import render_pdf
+    from autobookkeeping.taxes import calculate
+    seed=workflow.prepare(order,checks)
+    original=copy.deepcopy(archive.catalog()['local_invoice_drafts'][seed['id']]['current'])
+    workflow.discard(seed['id'])
+    original.update(calculate(original['positions'],False,[19,7]))
+    original.update(kind='invoice',source='synthetic-historical',source_id='mixed',number='0899',status='issued')
+    metadata=tmp_path/'synthetic-historical.json';metadata.write_bytes(encoded(original))
+    pdf=tmp_path/'synthetic-historical.pdf';pdf.write_bytes(render_pdf(original,draft=False))
+    imported=archive.import_local(metadata,[pdf])
+    workflow.activate('0900','0900',True)
+    invoice={'id':imported['record_id']};adjust=Adjustments(workflow)
     original=archive.catalog()["records"][invoice["id"]]["current"]
     assert original["vat_breakdown"]==[{"vat_rate":7,"gross":"3.00","net":"2.80","vat":"0.20"}, {"vat_rate":19,"gross":"10.00","net":"8.40","vat":"1.60"}]
     first=adjust.prepare(invoice["id"],"partial_refund",{"reason":"Teilretoure","allocations":[{"position_index":0,"gross":"1.01"}]})
@@ -71,6 +81,22 @@ def test_mixed_tax_partial_refunds_caps_and_rounding(workspace):
     for key in ("gross","net","vat"):
         assert sum(Decimal(r[key]) for r in credits)==-Decimal(original[key])
     assert fully_cancelled(archive.catalog(),invoice["id"]) and archive.verify()["ok"]
+
+
+def test_regular_tax_profile_and_new_invoice_paths_are_blocked(workspace):
+    archive,workflow,order,checks=workspace
+    before=archive.catalog()
+    with pytest.raises(WorkflowError,match='Kleinunternehmer'):
+        change_tax_profile(workflow,False,'Unsupported switch',True)
+    assert archive.catalog()==before
+    draft=workflow.prepare(order,checks)
+    workflow.activate('0900','0900',True)
+    catalog=archive.catalog();catalog['local_invoice_settings']['seller']['small_business']=False
+    archive.save_catalog(catalog);before=archive.catalog()
+    with pytest.raises(WorkflowError,match='Kleinunternehmer'):workflow.prepare(order,checks,rates=[19,7])
+    with pytest.raises(WorkflowError,match='Kleinunternehmer'):
+        workflow.issue(draft['id'],draft['revision'],'0901',order,True)
+    assert archive.catalog()==before
 
 
 def test_refund_cash_year_and_no_automatic_payment(workspace):
