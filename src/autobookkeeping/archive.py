@@ -369,6 +369,12 @@ class Archive:
             if (self.repo / name).exists():atomic(target / name, (self.repo / name).read_bytes())
         for name in ('AGENTS.md','verfahrensdokumentation.md','buchhaltung/README.md','buchhaltung/AGENTS.md'):
             if (self.repo / name).exists():atomic(target / 'dokumentation' / name,(self.repo / name).read_bytes())
+        operating = catalog.get('operating_procedure')
+        if operating:
+            from autobookkeeping.procedure import markdown
+            atomic(target / 'dokumentation/betriebsangaben.md', markdown(operating['current']).encode('utf8'))
+            for index, prior in enumerate(operating['history'], 1):
+                atomic(target / f'dokumentation/betriebsangaben-historie/{index:04d}.md', markdown(prior).encode('utf8'))
         for path in (self.repo / 'migration').rglob('*.enc'):
             atomic(target / 'migration' / path.relative_to(self.repo / 'migration'), path.read_bytes())
         atomic(target / 'export-manifest.json', encoded({'version':2,'scope':'complete',

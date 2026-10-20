@@ -172,13 +172,14 @@ def generate_xml(invoice: dict, draft=False):
         e=ET.SubElement(parent,f'{{{CBC}}}'+name,**attrs);e.text=str(value);return e
     def a(parent,name):return ET.SubElement(parent,f'{{{CAC}}}'+name)
     def money(parent,name,value):return b(parent,name,f'{abs(Decimal(str(value))):.2f}',currencyID='EUR')
-    number=invoice.get('number')
+    number=invoice.get('document_number') or invoice.get('number')
     if not number:
         if not draft:raise ValueError('Ausgestellte E-Rechnung benötigt endgültige Nummer')
         number='TEST-'+invoice['id'].split(':')[-1]
     b(root,'UBLVersionID','2.1');b(root,'CustomizationID','urn:cen.eu:en16931:2017')
     b(root,'ID',number);b(root,'IssueDate',invoice['date'])
-    b(root,'CreditNoteTypeCode' if credit else 'InvoiceTypeCode','381' if credit else '380')
+    b(root,'CreditNoteTypeCode' if credit else 'InvoiceTypeCode',
+      '381' if credit else '384' if invoice.get('document_type') == 'correction' else '380')
     if draft:b(root,'Note','TESTENTWURF: keine ausgestellte Rechnung; keine Nummer reserviert.')
     if invoice.get('reason'):b(root,'Note',invoice['reason'])
     b(root,'DocumentCurrencyCode','EUR')
@@ -229,10 +230,10 @@ def generate_xml(invoice: dict, draft=False):
     return data,validation
 
 
-def archive_xml(invoice, catalog, documents):
+def archive_xml(invoice, catalog, documents, xml_invoice=None):
     """Bind original XML and validation evidence to the issued immutable record."""
     from autobookkeeping.archive import encoded, sha
-    data, validation = generate_xml(invoice)
+    data, validation = generate_xml(xml_invoice if xml_invoice is not None else invoice)
     base = f"{invoice['year']}/Rechnungen/{sha((invoice['id']+':'+sha(data)).encode())}"
     for suffix, payload, role in (('.xml', data, 'e_invoice_xml'),
                                   ('.validation.json', encoded(validation), 'e_invoice_validation')):

@@ -18,7 +18,7 @@ from autobookkeeping.receipts import CATEGORIES
 from autobookkeeping.homeoffice import public_allowances, DEFAULT_DAYS
 
 
-PUBLIC_ROW_KEYS={"ref","date","kind","number","proposed_number","document_type","related_number","status","gross_cents","net_cents","vat_cents",
+PUBLIC_ROW_KEYS={"ref","date","kind","number","proposed_number","document_type","related_number","status","gross_cents","net_cents","vat_cents","e_invoice_available",
                  "vat_rates","tax_treatment","expense_category","coverage","source","flows","warnings","document_effect_cents"}
 PUBLIC_FLOW_KEYS={"ref","date","amount_cents","bucket","origin"}
 
@@ -49,6 +49,7 @@ def public_retention(catalog):
 def projection(catalog: dict, source_digest: str) -> dict:
     from autobookkeeping.backups import public_status as backup_status
     from autobookkeeping.reconciliation import public_status as reconcile_status
+    from autobookkeeping.procedure import public_status as procedure_status
     rows=[]
     values=[("records", v["current"]) for v in catalog["records"].values()]
     values += [(section, v["current"]) for section in ("local_invoice_drafts","local_adjustment_drafts","local_expense_drafts")
@@ -102,6 +103,8 @@ def projection(catalog: dict, source_digest: str) -> dict:
                 "expense_category":row.get("category") if row.get("kind") in ("expense","expense_credit") and row.get("category") in CATEGORIES else None,
                 "coverage":"complete" if row.get("coverage")=="complete" or kind=="draft" else "missing",
                 "source":"local" if row.get("source")=="local" else "imported",
+                "e_invoice_available":any(name.endswith('.xml.enc') for name in row.get('documents', []))
+                    or kind == 'draft' and row.get('kind') == 'correction',
                 "flows":flows,"warnings":sorted(set(warnings)),"document_effect_cents":effect}
         if set(result)!=PUBLIC_ROW_KEYS or any(set(flow)!=PUBLIC_FLOW_KEYS for flow in flows):
             raise ValueError("Dashboard-Schema überschreitet freigegebene Felder")
@@ -109,6 +112,7 @@ def projection(catalog: dict, source_digest: str) -> dict:
     rows.sort(key=lambda r:(r["date"] or "",r["ref"]))
     return {"schema_version":1,"source_sha256":source_digest,"timezone":"Europe/Berlin","currency":"EUR",
             "backups":backup_status(catalog), "reconciliation":reconcile_status(catalog),
+            "operating_procedure": procedure_status(catalog),
             "retention":public_retention(catalog),
             "basis":"Erfasste Zahlungsbewegungen; Belegbeträge getrennt. Arbeitsübersicht, keine vollständige steuerliche EÜR.",
             "gaps":["Erfasste Verkäufe mit eBay-API abgleichen; tatsächliche Zahlungsverfügbarkeit gesondert prüfen. Kein automatischer Gebührenimport.",
@@ -167,8 +171,18 @@ def procedure_document(source: bytes | None, operating_present=False) -> str:
         body.append('<p>'+inline(' '.join(paragraph))+'</p>')
     operating=('<a href="verfahrensdokumentation.md">Private betriebliche Ergänzung öffnen</a>' if operating_present else
                'Private betriebliche Ergänzung fehlt. Vorlage docs/betriebliche-ergaenzung-vorlage.md im privaten Datenrepo ausfüllen.')
+    from autobookkeeping.procedure import interview_prompt
+    interview = ('<section class="procedure-status"><h3>Betriebliche Abläufe gemeinsam beschreiben</h3>'
+        '<p id="operating-procedure-status"></p><p>Terminal-Interview vorbereiten (Ordner muss außerhalb beider Repos neu sein):</p>'
+        '<p><code>.venv\\Scripts\\python.exe -X utf8 -m autobookkeeping.cli verfahrensdoku vorbereiten --interactive --output \'NEUER_ORDNER_AUSSERHALB\'</code></p>'
+        '<p>Erst den Entwurf lesen. Zum verschlüsselten Speichern die zurückgegebene Revision verwenden: '
+        '<code>buchhaltung verfahrensdoku speichern --answers \'ENTWURFSORDNER/betriebsangaben.json\' --revision REVISION --approved</code>.</p>'
+        '<p>Gespeicherte private Angaben außerhalb anzeigen: <code>buchhaltung verfahrensdoku anzeigen --output \'NEUER_ORDNER_AUSSERHALB\'</code>.</p>'
+        '<details><summary>Prompt für deinen Agenten oder ausnahmsweise einen normalen Chat kopieren</summary>'
+        '<textarea rows="14" readonly style="width:100%">' + escape(interview_prompt()) + '</textarea></details></section>')
     return ('<aside class="procedure-status"><strong>Technik und tatsächlicher Betrieb gehören zusammen.</strong><p>'+operating+
             '</p><p>Die allgemeine Beschreibung ersetzt keine ausgefüllte Betriebsdokumentation und keine tatsächlich durchgeführten Kontrollen. Persönliche Betriebsangaben werden nicht in dieses HTML kopiert.</p></aside>'+
+            interview+
             '<details class="procedure-toc" open><summary>Inhaltsverzeichnis</summary><ul>'+''.join(toc)+'</ul></details>'+
             '<article class="procedure-text">'+''.join(body)+'</article><p class="foot">Quelle: docs/verfahrensdokumentation.md · SHA-256: '+sha(source)+
             ' · Eingebetteter Stand bei Dashboard-Erzeugung. Quellenlinks öffnen erst nach Anklicken eine externe Website.</p>')

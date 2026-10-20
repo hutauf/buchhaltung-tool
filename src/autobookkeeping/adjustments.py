@@ -73,6 +73,24 @@ def context_hash(catalog: dict, invoice_id: str) -> str:
     return sha(encoded({"original": catalog["records"][invoice_id]["current"], "related": sorted(related, key=lambda r:r["id"])}))
 
 
+def correction_xml_invoice(row, catalog):
+    """Full corrected structured invoice; the ledger correction itself remains zero."""
+    original = original_view(catalog, row['original_id'])
+    result = copy.deepcopy(original)
+    result.update({key: copy.deepcopy(row[key]) for key in
+                   ('id', 'date', 'year', 'buyer', 'delivery_date', 'original_number', 'original_date', 'reason')})
+    number = row.get('document_number') or row.get('number')
+    result.update(number=number, document_number=number, document_type='correction', kind='invoice')
+    groups = {}
+    for position in result['positions']:
+        group = groups.setdefault(position['vat_rate'], {field: Decimal(0) for field in ('gross', 'net', 'vat')})
+        for field in group: group[field] += Decimal(position[field])
+    result['vat_breakdown'] = [dict(vat_rate=rate, **{key: str(value) for key, value in group.items()})
+                               for rate, group in sorted(groups.items())]
+    result['reason'] += ' · Formale Berichtigung mit unveränderten Originalbeträgen; kein neuer Umsatz oder Zahlungsauftrag.'
+    return result
+
+
 def remaining_positions(catalog: dict, original: dict) -> list[dict]:
     remaining = [{field: Decimal(p[field]) for field in ("gross", "net", "vat")} for p in original["positions"]]
     for credit in credits(catalog, original["id"]):
@@ -221,9 +239,9 @@ class Adjustments:
         row["documents"]=[name]
         after["documents"][name]={"record_id":row["id"],"role":row["kind"],"sha256_plaintext":sha(pdf),"bytes_plaintext":len(pdf)}
         documents={name:pdf}
-        if row['kind']=='credit_note':
+        if row['kind'] in ('credit_note', 'correction'):
             from autobookkeeping.einvoices import archive_xml
-            archive_xml(row,after,documents)
+            archive_xml(row,after,documents,correction_xml_invoice(row,after) if row['kind']=='correction' else None)
         row["revision"]=sha(encoded(row))
         after["records"][row["id"]]={"current":row,"history":[]}
         value["history"].append(copy.deepcopy(draft));value["current"]=dict(draft,status="issued",number=row["number"],document_number=proposal,invoice_id=row["id"],documents=row["documents"])

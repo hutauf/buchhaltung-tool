@@ -6,7 +6,7 @@ import pytest
 from autobookkeeping.ebay_client import EbayTradingClient
 from autobookkeeping.models import EbayOrder, EbayOrderItem
 from autobookkeeping.archive import Archive
-from autobookkeeping.reconciliation import compare, scan, public_status, matches
+from autobookkeeping.reconciliation import compare, scan, public_status, matches, findings, explain
 
 
 def page(number,more,ids):
@@ -62,3 +62,46 @@ def test_saved_scan_is_encrypted_evidence_not_a_bookkeeping_write(tmp_path):
     assert all(b'PRIVATE BUYER' not in p.read_bytes() for p in archive.root.rglob('*.enc'))
     c.orders_complete=False
     with pytest.raises(ValueError):scan(archive,c,{},90,True)
+
+
+def test_explanation_survives_empty_windows_but_not_a_changed_or_returned_case(tmp_path, monkeypatch):
+    from autobookkeeping.local_invoices import LocalInvoices
+    import autobookkeeping.reconciliation as reconciliation
+    archive=Archive(tmp_path/'repo','synthetic-password');archive.repo.mkdir();archive.init()
+    client=SimpleNamespace(get_orders=lambda **kw:[order()],orders_complete=True,order_window={},order_pages=[b'<Synthetic/>'])
+    moments=iter(f'2011-10-{i:02d}T12:00:00+00:00' for i in range(3,20))
+    monkeypatch.setattr(reconciliation,'now',lambda:next(moments))
+    scan(archive,client,{'items':[]},90,True)
+    case=findings(archive.catalog())[0]; original_scans=archive.catalog()['ebay_reconciliations']
+    with pytest.raises(ValueError):explain(LocalInvoices(archive),case['ref'],'PRIVATE REASON',False)
+    explain(LocalInvoices(archive),case['ref'],'PRIVATE REASON',True)
+    assert archive.catalog()['ebay_reconciliations']==original_scans
+    assert findings(archive.catalog())[0]['status']=='explained'
+    scan(archive,client,{'items':[]},90,True)
+    assert findings(archive.catalog())[0]['status']=='explained'
+    client.get_orders=lambda **kw:[];scan(archive,client,{'items':[]},90,True)
+    assert public_status(archive.catalog())['explained_findings']==1
+    assert 'PRIVATE REASON' not in str(public_status(archive.catalog()))
+    client.get_orders=lambda **kw:[replace(order(),total_value=12)]
+    scan(archive,client,{'items':[]},90,True)
+    assert findings(archive.catalog())[0]['status']=='open'
+    with pytest.raises(ValueError):explain(LocalInvoices(archive),case['ref'],'stale',True)
+    client.get_orders=lambda **kw:[order()];scan(archive,client,{'items':[]},90,True)
+    assert findings(archive.catalog())[0]['status']=='open'
+    explain(LocalInvoices(archive),case['ref'],'Second explanation',True)
+    explain(LocalInvoices(archive),case['ref'],'Reopen reason',True,True)
+    assert findings(archive.catalog())[0]['status']=='open'
+    assert len(archive.catalog()['ebay_reconciliation_notes'])==3
+    assert archive.verify()['ok']
+
+
+def test_cancelled_replacement_chain_is_distinct_from_unrelated_duplicate_invoices():
+    context={'order_id':'PAID-SYNTHETIC','sales_record_number':'SRN-SYNTHETIC'}
+    first=dict(id='original',kind='invoice',source_id='one',gross='11.00',status='cancelled',coverage='complete',**context)
+    replacement=dict(first,id='replacement',source_id='two',status='issued',replacement_of='original')
+    catalog={'records':{'original':{'current':first},'replacement':{'current':replacement}}}
+    assert compare(catalog,[order()],{'items':[]})[0]['state']=='adjusted'
+    del replacement['replacement_of']
+    assert compare(catalog,[order()],{'items':[]})[0]['state']=='ambiguous'
+    replacement['status']='cancelled'
+    assert compare(catalog,[order()],{'items':[]})[0]['state']=='ambiguous'

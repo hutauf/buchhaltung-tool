@@ -30,6 +30,16 @@ def test_correction_number_original_immutability_and_stale_draft(workspace):
     with pytest.raises(WorkflowError):
         adjust.issue(draft["id"],draft["revision"],draft["proposed_number"],False)
     result=finalize(adjust,draft)
+    correction=archive.catalog()['records'][result['id']]['current']
+    xml=archive.read(next(name for name in correction['documents'] if name.endswith('.xml.enc')))
+    from lxml import etree
+    tree=etree.fromstring(xml);ns={'cbc':'urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2',
+                                  'cac':'urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2'}
+    assert tree.find('cbc:InvoiceTypeCode',ns).text=='384'
+    assert tree.find('cbc:ID',ns).text=='0901-K1'
+    assert tree.find('cac:BillingReference/cac:InvoiceDocumentReference/cbc:ID',ns).text=='0901'
+    assert tree.find('cac:LegalMonetaryTotal/cbc:TaxInclusiveAmount',ns).text=='13.00'
+    assert correction['gross']=='0.00' and correction['e_invoice']['en16931_valid']
     text=PdfReader(io.BytesIO(archive.read(archive.catalog()["records"][result["id"]]["current"]["documents"][0]))).pages[0].extract_text()
     assert "Rechnungsberichtigung 0901-K1" in text and "Neue Teststraße" in text and "Betrag und Steuerbeträge bleiben unverändert" in text
     assert archive.catalog()["records"][invoice["id"]]==before and archive.read(invoice["documents"][0])==pdf

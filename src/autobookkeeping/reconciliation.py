@@ -6,7 +6,8 @@ from autobookkeeping.archive import encoded, sha
 from autobookkeeping.local_invoices import now, record_context, WorkflowError
 
 STATES = {'unpaid', 'matched', 'amount_mismatch', 'ambiguous', 'draft',
-          'external_reference', 'missing_invoice', 'private', 'missing_original'}
+          'external_reference', 'missing_invoice', 'private', 'missing_original', 'adjusted'}
+FINDINGS = STATES - {'unpaid', 'matched', 'private'}
 
 
 def identity(row):
@@ -43,7 +44,20 @@ def compare(catalog, orders, checklist):
             if matches(context, record_context(row)) or related: found.append(row)
         state = 'unpaid' if order.paid_at is None else 'missing_invoice'
         if order.paid_at is not None:
-            if len(found) > 1 or len(links) > 1: state = 'ambiguous'
+            from autobookkeeping.adjustments import fully_cancelled, credits
+            cancelled = [r for r in found if r.get('status') == 'cancelled' or fully_cancelled(catalog, r['id'])]
+            active = [r for r in found if r not in cancelled]
+            # A cancelled original plus its explicitly linked replacement is one chain.
+            connected = {found[0]['id']} if found else set()
+            while True:
+                extended = connected | {r['id'] for r in found if r.get('replacement_of') in connected}
+                extended |= {r['replacement_of'] for r in found if r['id'] in connected and r.get('replacement_of')}
+                if extended == connected: break
+                connected = extended
+            chain = len(active) <= 1 and all(r['id'] in connected for r in found)
+            adjusted = bool(cancelled or any(credits(catalog, r['id']) for r in found))
+            if len(links) > 1 or len(found) > 1 and not (adjusted and chain): state = 'ambiguous'
+            elif adjusted: state = 'adjusted'
             elif found:
                 row = found[0]
                 if row.get('currency', 'EUR') != order.currency or Decimal(str(row.get('gross'))) != Decimal(str(order.total_value)):
@@ -93,13 +107,67 @@ def scan(archive, client, checklist, days=90, save=False):
     return result
 
 
+def finding_ref(row):
+    return sha(encoded(row))[:20]
+
+
+def findings(catalog):
+    """Latest observation per sale, retained even outside subsequent API windows."""
+    latest = []
+    for scan_id, check in sorted(catalog.get('ebay_reconciliations', {}).items(), key=lambda p: (p[1]['at'], p[0])):
+        for row in check['rows']:
+            linked = [old for old in latest if matches(old['row'], row)]
+            aliases = set(identity(row))
+            for old in linked:
+                aliases.update(identity(old['row']))
+                latest.remove(old)
+            context = dict(row, order_id_aliases=sorted(aliases - {row.get('order_id')}))
+            anchor = linked[0]['scan_id'] if len(linked) == 1 and linked[0]['observed_row'] == row else scan_id
+            latest.append({'scan_id': anchor, 'ref': finding_ref(row), 'row': context,
+                           'observed_row': row, 'observed_at': check['at']})
+    notes = list(catalog.get('ebay_reconciliation_notes', {}).values())
+    result = []
+    for entry in latest:
+        if entry['row']['state'] not in FINDINGS: continue
+        relevant = [note for note in notes if note['scan_id'] == entry['scan_id']
+                    and note['row_sha256'] == sha(encoded(entry['observed_row']))]
+        note = max(relevant, key=lambda n: n['sequence'], default=None)
+        result.append(dict(entry, status='explained' if note and note['action'] == 'explain' else 'open', note=note))
+    return sorted(result, key=lambda r: (r['observed_at'], r['ref']))
+
+
+def explain(workflow, reference, reason, approved, reopen=False):
+    """An explanation changes no API evidence, invoice or financial amount."""
+    if not approved or not isinstance(reason, str) or not reason.strip():
+        raise WorkflowError('Dokumentation der Abweichung benötigt den konkreten Grund und eine Bestätigung')
+    workflow.archive.verify(); before = workflow.archive.catalog()
+    candidates = [f for f in findings(before) if f['ref'] == reference]
+    if len(candidates) != 1: raise WorkflowError('Abweichung fehlt oder ist inzwischen verändert; Fälle erneut anzeigen')
+    found = candidates[0]
+    if reopen and found['status'] != 'explained': raise WorkflowError('Abweichung ist bereits offen')
+    after = copy.deepcopy(before)
+    notes = after.setdefault('ebay_reconciliation_notes', {})
+    body = {'sequence': len(notes) + 1, 'scan_id': found['scan_id'],
+            'row_sha256': sha(encoded(found['observed_row'])), 'at': now(),
+            'action': 'reopen' if reopen else 'explain', 'reason': reason.strip()}
+    identifier = sha(encoded(body)); notes[identifier] = body
+    workflow.commit(before, after, {})
+    return {'ok': True, 'ref': reference, 'status': 'open' if reopen else 'explained',
+            'financial_records_changed': False}
+
+
 def public_status(catalog):
     values = catalog.get('ebay_reconciliations', {}).values()
     latest = max(values, key=lambda r: r['at'], default=None)
     if not latest: return {'available': False}
+    cases = findings(catalog)
     return {'available': True, 'at': latest['at'], 'days': latest['days'], 'pages': latest['pages'],
             'complete': latest['complete'], 'orders': latest['orders'],
-            'counts': {k: v for k,v in latest['counts'].items() if k in STATES}}
+            'counts': {k: v for k,v in latest['counts'].items() if k in STATES},
+            'open_findings': sum(f['status'] == 'open' for f in cases),
+            'explained_findings': sum(f['status'] == 'explained' for f in cases),
+            'findings': [{'ref': f['ref'], 'state': f['row']['state'], 'status': f['status']}
+                         for f in cases]}
 
 
 def validate(catalog):
@@ -110,3 +178,12 @@ def validate(catalog):
             or len(row['rows']) != row['orders'] or dict(Counter(r['state'] for r in row['rows'])) != row['counts']
             or not set(row['counts']) <= STATES or any(n not in catalog['documents'] for n in row['documents'])):
             raise ValueError('eBay-Abgleichnachweis ist unvollständig oder widersprüchlich')
+    for sequence, (identifier, note) in enumerate(sorted(catalog.get('ebay_reconciliation_notes', {}).items(), key=lambda p: p[1]['sequence']), 1):
+        check = catalog.get('ebay_reconciliations', {}).get(note['scan_id'])
+        if (sha(encoded(note)) != identifier or note['sequence'] != sequence or not check
+            or note['action'] not in ('explain', 'reopen') or not str(note.get('reason') or '').strip()
+            or not any(sha(encoded(r)) == note['row_sha256'] and r['state'] in FINDINGS for r in check['rows'])):
+            raise ValueError('Abweichungsvermerk hat keinen gültigen Originalbezug')
+        from datetime import datetime
+        if datetime.fromisoformat(note['at']).tzinfo is None:
+            raise ValueError('Abweichungsvermerk benötigt einen Zeitpunkt mit Zeitzone')

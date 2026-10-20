@@ -488,10 +488,16 @@ class LocalInvoices:
         if invoice["status"] == "discarded":
             raise WorkflowError("Verworfenen Entwurf nicht als aktuelle Vorschau exportieren")
         xml = None
-        if e_invoice and invoice.get("kind") != "correction":
+        if e_invoice:
             from autobookkeeping.einvoices import generate_xml, validate_xml
             stored = next((n for n in invoice["documents"] if n.endswith('.xml.enc')), None)
-            xml, validation = (self.archive.read(stored), validate_xml(self.archive.read(stored))) if stored else generate_xml(invoice, draft=invoice["status"]=="test_draft")
+            if invoice.get('kind') == 'correction' and not stored:
+                if invoice['status'] != 'test_draft':
+                    raise WorkflowError('Historische PDF-Berichtigung enthält keine archivierte XML; Original wird nicht nachträglich verändert')
+                from autobookkeeping.adjustments import correction_xml_invoice
+                xml, validation = generate_xml(correction_xml_invoice(invoice, catalog), draft=True)
+            else:
+                xml, validation = (self.archive.read(stored), validate_xml(self.archive.read(stored))) if stored else generate_xml(invoice, draft=invoice["status"]=="test_draft")
         atomic(target / "rechnung.pdf", self.archive.read(invoice["documents"][0]))
         if xml:
             atomic(target / "rechnung.xml", xml)

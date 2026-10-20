@@ -4,6 +4,8 @@ from autobookkeeping.taxes import decimal_money
 
 
 def validate(catalog):
+    from autobookkeeping.procedure import validate as validate_procedure
+    validate_procedure(catalog)
     from autobookkeeping.homeoffice import validate as validate_homeoffice
     validate_homeoffice(catalog)
     from autobookkeeping.backups import validate as validate_backups

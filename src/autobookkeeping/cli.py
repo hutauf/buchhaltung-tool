@@ -15,6 +15,8 @@ ROUTES = {
     "dashboard": ("build_bookkeeping_dashboard.py", [], "Anonymisierte HTML-Uebersicht erzeugen"),
     "sicherung": ("backup_register.py", [], "Sicherungsregister: exportieren, Medium bestaetigen, Restore testen"),
     "abgleich": ("reconcile_ebay.py", [], "Vollstaendiger eBay-Verkaufsabgleich ohne Gebuehrenimport"),
+    "verfahrensdoku": ("procedure.py", [], "Betriebliche Abläufe beschreiben und privat versionieren"),
+    "jahresbericht": ("annual_report.py", [], "Jahresübersicht mit vollständigem Archiv außerhalb exportieren"),
     "veroeffentlichen": ("publish_bookkeeping.py", [], "Git-/Zeitnachweis-Pipeline pruefen und fortsetzen"),
     "homeoffice": ("homeoffice.py", [], "Homeoffice-Tage pruefen und nach Freigabe speichern"),
     "ebay": ("get_ebay_orders.py", [], "eBay-Bestellungen lesen"),

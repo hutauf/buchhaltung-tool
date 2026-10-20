@@ -2,6 +2,16 @@
 
 ## Unveröffentlicht
 
+- Dauerhafte eBay-Abweichungsvermerke mit Originalbezug, Wiederöffnung und
+  anonymisierter Dashboard-Anzeige; Storno-/Ersatzketten gesondert sichtbar.
+- Geführte private Betriebsdokumentation per Terminal oder Agenten-Prompt,
+  prüfbare externe Entwürfe und verschlüsselte versionierte Speicherung.
+- Jahresbericht mit Zahlungs-CSV und vollständigem Archivexport. Keine neue
+  Zeitstempel-Einreichung für Leseexporte. EÜR-/DATEV-Zuordnung zunächst als Vorschlag.
+- Neue formale Rechnungsberichtigungen auch als validierte EN16931-XML Typ 384.
+  Originalbeträge bleiben erhalten; kein zusätzlicher Geldfluss. Verfahrensbeschreibung Version 9.
+
+
 - Dashboard prüft das erinnerte Passwort jetzt tatsächlich offline: archivbezogener
   Salt, PBKDF2-HMAC-SHA256 mit 2.100.000 Iterationen, Fehlermeldung bei falscher
   Eingabe und 24-Stunden-Bestätigung ausschließlich nach Erfolg. Kein Passwort

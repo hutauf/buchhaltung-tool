@@ -1,6 +1,6 @@
 # Verfahrensdokumentation der lokalen Belegablage
 
-Version 8 · Technikstand 20.10.2026, rechtliche Grundlagen zuletzt geprüft am 07.10.2026. Sicherheitsbeschreibung mit Implementierung und OpenTimestamps-Primärdokumentation am 19.10.2026 abgeglichen. Änderungen dieser Beschreibung werden mit der Toolhistorie versioniert. Die im privaten Workspace verwendete Toolrevision steht in `tool-version.json`.
+Version 9 · Technikstand 20.10.2026, rechtliche Grundlagen zuletzt geprüft am 20.10.2026. Sicherheitsbeschreibung mit Implementierung und OpenTimestamps-Primärdokumentation am 19.10.2026 abgeglichen. Änderungen dieser Beschreibung werden mit der Toolhistorie versioniert. Die im privaten Workspace verwendete Toolrevision steht in `tool-version.json`.
 
 ## 1. Allgemeine Beschreibung
 
@@ -41,11 +41,19 @@ Belege unverzüglich sichern. Der Agent prüft Bestand, Quelle und Dubletten; eB
 
 ### Eigene Rechnungen und Korrekturen
 
-Rechnungsentwürfe verbrauchen keine endgültige Nummer. Vor Produktionsbetrieb ist eine gesonderte geprüfte Nummernübergabe erforderlich. Der konkrete Abschluss verlangt Entwurfsrevision, vorgeschlagene Nummer und Freigabe. PDF, eigenständige EN16931-UBL-2.1-XML und Validierungsnachweis entstehen gemeinsam vor der Archivtransaktion. Fehlgeschlagene XML-Prüfung verhindert den Abschluss. Der eigene Ablauf ist auf bezahlte inländische EUR-Verkäufe mit geprüftem Steuerprofil beschränkt.
+Rechnungsentwürfe verbrauchen keine endgültige Nummer. Vor Produktionsbetrieb ist eine gesonderte geprüfte Nummernübergabe erforderlich. Der konkrete Abschluss verlangt Entwurfsrevision, vorgeschlagene Nummer und Freigabe. PDF, eigenständige EN16931-UBL-2.1-XML und Validierungsnachweis entstehen gemeinsam vor der Archivtransaktion. Fehlgeschlagene XML-Prüfung verhindert den Abschluss. Der eigene Ablauf unterstützt inländische EUR-Verkäufe mit geprüftem Steuerprofil: eBay-Entwürfe aus bezahlten Bestellungen und manuelle Rechnungen auch vor Zahlung. Die tatsächliche Zahlung wird separat erfasst.
 
-Originalrechnung und Originalnummer bleiben bestehen. Finanzielle Minderungen bekommen einen eigenen fortlaufenden Beleg und XML mit Originalbezug. Formale Berichtigungen bleiben verknüpfte PDF-Dokumente mit eigener Berichtigungskennung; die strukturierte Darstellung solcher Berichtigungen ist noch nicht umgesetzt. Eine Stornorechnung führt keine Überweisung aus. Tatsächliche Rückzahlungen werden gesondert nach Nachweis und Freigabe erfasst; fehlerhafte Zahlungszuordnungen werden nachvollziehbar berichtigt.
+Originalrechnung und Originalnummer bleiben bestehen. Finanzielle Minderungen bekommen einen eigenen fortlaufenden Beleg und XML mit Originalbezug. Neue formale Berichtigungen erhalten eine eigene Berichtigungskennung sowie PDF und validierte EN16931-XML mit Rechnungstyp 384 und Originalbezug. Die XML enthält die berichtigten Pflichtangaben und unveränderten vollständigen Originalbeträge; der Berichtigungsdatensatz selbst bleibt finanziell null und erzeugt keinen neuen Geldfluss. Historische PDF-Berichtigungen bleiben unverändert erhalten. Empfängeranschrift und Lieferdatum sind auch strukturierte Rechnungsangaben. Bei deren Änderung wird deshalb die XML berichtigt, auch wenn Geldbeträge gleich bleiben. Eine Stornorechnung führt keine Überweisung aus. Tatsächliche Rückzahlungen werden gesondert nach Nachweis und Freigabe erfasst; fehlerhafte Zahlungszuordnungen werden nachvollziehbar berichtigt.
 
 Ein einfaches PDF ist keine strukturierte E-Rechnung. Bei hybriden Rechnungen ist der strukturierte Teil maßgeblich; Bild-/XML-Abweichungen müssen geprüft werden. Die eigene XML wird separat ausgegeben. Es wird weder XRechnung-CIUS-Konformität noch ein PDF/A-3-/ZUGFeRD-Profil zugesichert. Kundenkommunikation und Übermittlung benötigen eine eigene Freigabe. [BMF: E-Rechnungs-FAQ, Fragen 2, 7, 12a und 13](https://www.bundesfinanzministerium.de/Content/DE/FAQ/e-rechnung.html).
+
+### Eigene Erläuterungen und betriebliche Beschreibung
+
+Das Tool führt keine Betriebsprüfung durch und erstellt keine steuerlichen Prüfbescheide. Eigene Belegkontrollen und Abweichungsvermerke dokumentieren nur den betrieblichen Ablauf. Die automatische Verknüpfung von Zahlungen mit archivierten Original-Zahlungsnachweisen bleibt ausdrücklich außerhalb des Funktionsumfangs. Textliche Zahlungsreferenzen bleiben nutzbar; benötigte Zahlungsunterlagen müssen anderweitig verfügbar sein.
+
+`abgleich faelle` zeigt die jüngste gespeicherte Beobachtung je Verkauf auch außerhalb späterer API-Zeitfenster. `abgleich klaeren --ref REFERENZ --interactive` speichert die konkrete Erläuterung verschlüsselt mit Zeitpunkt und Bezug zum unveränderten API-Abgleich. Ein erklärter Fall kann mit Begründung wieder geöffnet werden; frühere Vermerke bleiben erhalten. Ein geänderter beobachteter Sachverhalt wird wieder offen angezeigt. Ein späterer eindeutiger Treffer ist keine historische Löschung. Storno-/Minderungsbelege und explizite Ersatzketten werden als solche markiert, nicht automatisch als Zahlungsabgleich bestätigt.
+
+`verfahrensdoku vorbereiten` erstellt ein Terminal- oder agentisch vorbereitetes Interview-Ergebnis außerhalb beider Repos. Unbekanntes bleibt offen, Nichtanwendbarkeit wird begründet. `speichern` verlangt die konkrete Entwurfsrevision und Freigabe, erhält frühere Fassungen verschlüsselt und veröffentlicht über dieselbe Datenpipeline. Eine vorhandene private Markdown-Ergänzung bleibt zusätzlich erhalten. Die Anonymansicht zeigt nur Bearbeitungszahlen; vollständige Antworten lassen sich außerhalb exportieren und sind im vollständigen Katalog enthalten. Der [Interview-Leitfaden](verfahrensdoku-interview.md) beschreibt auch den Ausnahmefall eines Chats ohne Repositoryzugriff.
 
 ### Abschluss und Auswertung
 
@@ -101,6 +109,8 @@ Eingebettete Original-XML wird bytegleich zusätzlich zum empfangenen PDF archiv
 
 ### Prüfexport und Datenbeschreibung
 
+`jahresbericht --year JJJJ --output NEUES_ZIEL` ergänzt den vollständigen Export um lesbaren Jahresbericht, Jahreszahlungs-CSV und maschinenlesbare Zusammenfassung mit Dateiprüfsummen. Zahlungen werden nach Zahlungsjahr ausgewählt; zugehörige Belege und alle Archivjahre/Historien bleiben im vollständigen Export erhalten. Der Bericht nennt den aktuellen Git-Stand und gesondert, ob dessen Datenbank mit dem Arbeitsstand übereinstimmt. Vorhandene Zeitnachweise werden mitkopiert, ohne eine neue Blockchain-Verifikation zu behaupten. Der Bericht führt keine Buchung, keinen Datencommit und keine neue Zeitstempel-Einreichung aus. Er ist weder Betriebsprüfung noch abgabefertige Anlage EÜR. Die private betriebliche Beschreibung lässt sich zusätzlich über `verfahrensdoku anzeigen` lesbar bereitstellen. EÜR-Feldzuordnung und DATEV sind zunächst ein [fachlicher Vorschlag](euer-datev-vorschlag.md).
+
 `archiv export --output NEUES_ZIEL` entschlüsselt **alle inventarisierten Dokumente**, einschließlich historischer, verworfener und ungebuchter Entwürfe. `--year` ist nur eine Ansichtsangabe. Der Originalkatalog bleibt vollständig; exportierte Pfade stehen im Exportmanifest. Authentifizierungsdateien werden nicht übernommen. Ein solcher Klartextexport ist selbst schutzbedürftig.
 
 | Datei/Feld | Bedeutung |
@@ -119,6 +129,8 @@ Eingebettete Original-XML wird bytegleich zusätzlich zum empfangenen PDF archiv
 | `homeoffice_allowances` | Bestätigte Jahresansätze mit Historie; kein Geldfluss |
 | `audit_trail` | Erhaltener Ausgangsbestand, verkettete Katalogänderungen mit Vorher-/Nachher-Werten und Toolrevision |
 | `processing_controls` | Durchgeführte technische Archivprüfung vor Veröffentlichung; kein Vollständigkeitsnachweis |
+| `operating_procedure` | Private Betriebsangaben mit Gültigkeitsbeginn, Erfassungszeit und erhaltenen Fassungen |
+| `ebay_reconciliation_notes` | Eigene Erläuterungen/Wiederöffnungen mit unverändertem API-Bezug; keine Finanzamtsprüfung |
 | `ebay_reconciliations` | Vollständige API-Abrufe im begrenzten Zeitfenster mit verschlüsselten Originalantworten und Abgleichergebnissen |
 | `backup_register` | Exportstände, tatsächliche Medienbestätigungen/Rückleseprüfungen und Wiederherstellungsergebnisse mit Ereignishistorie |
 | `timestamp-status.json` | Technischer Verifikationscache, an genaue Nachweis-/OTS-Hashes gebunden; keine finanzielle Datenbank |
