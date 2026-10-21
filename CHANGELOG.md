@@ -2,6 +2,11 @@
 
 ## Unveröffentlicht
 
+- DATEV ausschließlich per CLI: Dashboard erstellt den Befehl statt Downloads.
+  Geschäftspartnernamen in EXTF-Buchungstext und Beleginformationen; vollständige
+  Personenmetadaten, Historien und Originale aller Jahre im Begleitarchiv außerhalb
+  beider Repos. Protokollierte Zeichen-/Feldanpassungen, vollständige Prüfsummen und
+  kein fertiger Zielordner bei Abbruch. Verfahrensbeschreibung Version 12.
 - DATEV-Leseexport per Dashboard und CLI: EXTF 700/13, CP1252/CRLF,
   echtes Empfängerprofil, SKR03-EÜR 2026, Zahlungen und Erstattungen ohne
   doppelte Erlöse, separater Homeoffice-Stapel. ZIP mit Begleitbericht und

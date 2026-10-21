@@ -1,44 +1,57 @@
 # DATEV-Export
 
-Im Dashboard oben **DATEV-Export** wählen. Der Dialog zeigt vor dem Download das
-Jahr, die Zahl der übernommenen Zahlungen/Pauschalen und alle bekannten
-Auslassungen. Die übrigen Dashboardfilter begrenzen diesen Jahresexport nicht.
-Aktuell ist das Kontenprofil für **2026** geprüft; andere Jahre benötigen ein
-eigenes geprüftes Profil.
-
-Für den DATEV-Dateikopf die **echte Berater- und Mandantennummer des Empfängers**
-eingeben. Diese Werte kommen von der empfangenden Kanzlei beziehungsweise dem
-DATEV-Bestand. Das Tool erfindet keine Platzhalter und speichert die Eingaben
-nicht dauerhaft. Ohne diese Angaben kann die Exportübersicht bereits als JSON
-heruntergeladen werden; eine gültige DATEV-Zieldatei braucht die Nummern.
-
-**DATEV-ZIP herunterladen** erzeugt lokal:
-
-- `EXTF_Buchungsstapel_2026.csv`: erfasste Zahlungen, Teilzahlungen und tatsächliche Erstattungen.
-- `EXTF_Pauschalen_2026.csv`: vorhandene bestätigte Homeoffice-Jahrespauschale, gesondert von Geldbewegungen. Entfällt ohne Pauschale.
-- `exportbericht.json`: jede Exportzeile mit stabiler anonymer Archivreferenz, Herkunft, Kontenzuordnung, Summen und ausdrücklich ausgeschlossenen Vorgängen.
-- `LESEN.txt` und `pruefsummen.json`: Umfang, Importhinweise und SHA-256 der enthaltenen Nutzdateien.
-
-Downloads außerhalb der Repositories speichern. Das Paket enthält keine Namen,
-Anschriften, Artikeltexte oder Originalbelege. Lieferantennummern, die nicht reine
-Ziffern sind, werden durch stabile Archivkennungen ersetzt; die vollständige
-Zuordnung bleibt im verschlüsselten Archiv. Für Originale und sämtliche
-Metadatenhistorien den vollständigen Archiv-/Jahresbericht separat bereitstellen.
-
-Alternativ, identisches DATEV-CSV-Format per CLI:
+Der Export läuft ausschließlich lokal über die CLI. Im Dashboard oben
+**DATEV-Export** öffnen, das Jahr, die echten Zielnummern und einen neuen
+Exportordner außerhalb beider Repositories angeben. **Befehl kopieren**, im
+Toolordner in PowerShell einfügen und ausführen. Der Dialog erzeugt keine Dateien
+und zeigt nur eine anonymisierte Vorschau zum gespeicherten Dashboardstand.
 
 ```powershell
 buchhaltung datev --year 2026 --advisor ECHTE_BERATERNUMMER --client ECHTE_MANDANTENNUMMER --output NEUER_ORDNER_AUSSERHALB
 ```
 
-Beide Wege lesen nur. Keine Buchung, Veröffentlichung, Übermittlung an DATEV,
-Git-Commits oder neue Bitcoin-Nachweise entstehen. Die CSV-Dateien entsprechen
-dem EXTF-Header 700, Kategorie 21, Buchungsstapel-Version 13, mit 125 Nutzfeldern,
+Berater- und Mandantennummer kommen von der empfangenden Kanzlei beziehungsweise
+dem DATEV-Bestand. Sie bestimmen den Zielbestand im DATEV-Dateikopf; das Tool
+erfindet keine Nummern. Das Archiv wird mit dem lokal konfigurierten
+`ENCRYPTION_PASSWORD` entschlüsselt. Das Passwort gehört weder in den Befehl noch
+in den Export. Fehlt die Konfiguration oder stimmt sie nicht, schlägt der Export
+fehl. Es gibt keine separate Anmeldung bei DATEV und keinen Versand.
+
+Der neue Zielordner enthält:
+
+- `EXTF_Buchungsstapel_2026.csv`: erfasste Zahlungen, Teilzahlungen und tatsächliche Erstattungen, mit vorhandenen Kunden-/Lieferantennamen.
+- `EXTF_Pauschalen_2026.csv`: vorhandene bestätigte Homeoffice-Jahrespauschale, separat von Geldbewegungen. Entfällt ohne Pauschale.
+- `exportbericht.json`: jede Exportzeile und Auslassung mit Archivbezug, Original-Belegnummer, vorhandenen Geschäftspartnerdaten, Herkunft, Kontenzuordnung und Summen.
+- `archiv/`: vollständiger Archivexport **aller Jahre**, einschließlich Original-PDF/XML, vollständigem UTF-8-Katalog, Personen-/Quellmetadaten, Historien, Tabellen und vorhandenen Nachweisen. Der DATEV-Jahresfilter entfernt keine Archivdaten. Bereits im Archiv fehlende Originale werden dadurch nicht ergänzt.
+- `LESEN.txt` und `pruefsummen.json`: Umfang, Importhinweise und SHA-256 sämtlicher Nutzdateien einschließlich des Begleitarchivs.
+
+**Der Export enthält personenbezogenen Klartext.** Geschützt aufbewahren und
+nur gezielt weitergeben; niemals ins Tool- oder Datenrepo zurückkopieren.
+Es entsteht ein Ordner, keine ZIP-Datei. Ein unterbrochener Export hinterlässt
+keinen scheinbar fertigen Zielordner. Der vollständige Begleitbestand ist eine
+separate Bereitstellung für den Empfänger; er wird nicht automatisch von DATEV
+als Buchungsstapel oder Dokumentenablage importiert.
+
+Kunden-/Lieferantennamen stehen im Buchungstext (höchstens 60 Zeichen) und in der
+Beleginformation „Geschäftspartner“ (höchstens 210 Zeichen). Zulässige vollständige
+Belegnummern werden übernommen; andernfalls bleibt ein stabiler Ersatz im
+Belegfeld, mit Originalnummer im Bericht und in einer weiteren Beleginformation.
+DATEV-Felder benötigen Windows-1252: nicht darstellbare Zeichen werden dort durch
+`?` ersetzt; Kürzungen, Leerraumbereinigung und Ersetzungen sind pro Zeile als
+`text_adaptations` vermerkt. Im UTF-8-Bericht und vollständigen Archiv bleiben die
+unveränderten Daten erhalten. Fehlende Namen werden als `counterparty_missing`
+markiert und nicht erfunden. Die Übergabe erzeugt keine Debitoren-/Kreditorenkonten
+oder OPOS-Stammdaten; Anschriften und weitere Kundendaten stehen im Begleitarchiv.
+
+Nur Lesezugriff: keine Buchung, Übermittlung an DATEV, Git-Commits oder neuen
+Bitcoin-Nachweise. Die CLI prüft den aktuellen Archivbestand und schreibt nur
+außerhalb beider Repos in einen neuen Ordner. Die CSV-Dateien verwenden
+EXTF-Header 700, Kategorie 21, Buchungsstapel-Version 13, 125 Nutzfelder,
 Windows-1252, Semikolon, Textquotierung, Dezimalkomma und CR/LF. Import ist für
-DATEV Rechnungswesen/Stapelverarbeitung vorgesehen, nicht als behaupteter direkter
+DATEV Rechnungswesen/Stapelverarbeitung vorgesehen, kein zugesicherter direkter
 Zeilensummenimport in DATEV EÜR Steuern. Die Importoption fordert keine automatische
-Festschreibung an. Der Empfängerbestand muss SKR03/EÜR mit den passenden
-Kontenfunktionen verwenden.
+Festschreibung an. Der Empfängerbestand muss SKR03/EÜR mit passenden Kontenfunktionen
+verwenden. Aktuell ist ausschließlich das Kontenprofil für **2026** geprüft.
 
 ## Fachliches Exportprofil
 
@@ -76,9 +89,9 @@ Dublettensperre der empfangenden Software.
 
 ## Prüfung und Quellen
 
-Python und Browser erzeugen bytegleiches DATEV-CSV. Synthetische Tests decken
+Synthetische CLI- und Dashboardtests decken
 Vorzeichen, Teilzahlungen, Erstattungen, Pauschalen, Auslassungen, Zielkennungen,
-Zeichenkodierung, Feldanzahl, Datumswerte und ZIP-/SHA-256-Integrität ab. Ein
+Zeichenkodierung, Feldanzahl, Datumswerte und SHA-256 sämtlicher Exportdateien ab. Ein
 separater Parser prüft die erzeugten Felder gegen das unterstützte Formatprofil.
 Das ist kein DATEV-Softwaretest oder Zertifikat. Ein echter Importlauf in einer
 DATEV-Anwendung ist mangels Empfängerinstallation nicht erfolgt; der lokale

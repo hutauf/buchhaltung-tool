@@ -28,7 +28,7 @@ def validate(data):
         or head[18] not in ('1','2') or head[19:22] != ['30','0','EUR'] or head[26] != '03'):
         raise ValueError('DATEV-Kalenderjahr, SKR03 oder Importoptionen falsch')
     # Our profile has no foreign-currency, VAT, OPOS, bank or external-document fields.
-    allowed = {0,1,2,6,7,9,10,13,20,21,41,113}
+    allowed = {0,1,2,6,7,9,10,13,20,21,22,23,24,25,41,113}
     refs = set()
     for fields in bookings:
         if len(fields) != 125: raise ValueError('DATEV-Buchungszeile braucht 125 Felder')
@@ -42,5 +42,9 @@ def validate(data):
             raise ValueError('DATEV-Belegnummer oder Buchungstext unzulässig')
         if fields[20] != 'Archiv-Referenz' or not re.fullmatch(r'[a-f0-9]{20}', fields[21]) or fields[21] in refs:
             raise ValueError('DATEV-Archivbezug fehlt oder ist doppelt')
+        for index, label in ((22, 'Geschäftspartner'), (24, 'Original-Belegnummer')):
+            if fields[index] or fields[index+1]:
+                if fields[index] != label or not 1 <= len(fields[index+1]) <= 210:
+                    raise ValueError('DATEV-Beleginformation unzulässig')
         refs.add(fields[21])
     return {'ok': True, 'format': 'EXTF 700/13', 'rows': len(bookings), 'encoding': 'Windows-1252', 'year': int(year)}

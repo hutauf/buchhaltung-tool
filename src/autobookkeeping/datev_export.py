@@ -1,11 +1,9 @@
 """Read-only EXTF 700/13 cash export for the reviewed SKR03 EÜR 2026 profile."""
 from __future__ import annotations
 
-import csv
-import io
 import re
-import zipfile
-from datetime import date, datetime, timezone
+import tempfile
+from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 
@@ -42,7 +40,7 @@ COLUMNS = ('Umsatz (ohne Soll/Haben-Kz);Soll/Haben-Kennzeichen;WKZ Umsatz;Kurs;B
     'Beteiligtennummer;Identifikationsnummer;Zeichnernummer;Postensperre bis;Bezeichnung SoBil-Sachverhalt;'
     'Kennzeichen SoBil-Buchung;Festschreibung;Leistungsdatum;Datum Zuord. Steuerperiode;Fälligkeit;Generalumkehr (GU);'
     'Steuersatz;Land;Abrechnungsreferenz;BVV-Position;EU-Land u. UStID (Ursprung);EU-Steuersatz (Ursprung);Abw. Skontokonto').split(';')
-TEXT_FIELDS = {1, 2, 10, 13, 20, 21, 41}  # zero based; only these text fields are populated
+TEXT_FIELDS = {1, 2, 10, 13, 20, 21, 22, 23, 24, 25, 41}
 HEADER_TEXT_FIELDS = {0, 3, 7, 8, 9, 16, 17, 21, 23, 26, 29, 30}
 REASONS = {
     'tax_scope': 'Kleinunternehmer-Steuerstatus fehlt oder widerspricht den Beträgen.',
@@ -103,7 +101,7 @@ def projection(catalog):
             if category not in ACCOUNTS: category = 'unassigned'
             number = str(row.get('document_number') or row.get('number') or '')
             # Invalid/private supplier numbering stays outside the anonymized projection.
-            number = number if re.fullmatch(r'[0-9]+(?:-K[0-9]+)?', number) else 'B' + sha(rid.encode())[:20]
+            number = number if len(number) <= 36 and re.fullmatch(r'[0-9]+(?:-K[0-9]+)?', number) else 'B' + sha(rid.encode())[:20]
             amount = flow['amount_cents']
             entries.append({'ref': flow['ref'], 'record_ref': sha(rid.encode())[:20], 'date': flow['date'],
                 'amount_cents': amount, 'bucket': flow['bucket'], 'category': category, 'account': ACCOUNTS[category],
@@ -118,9 +116,7 @@ def projection(catalog):
             'account': ACCOUNTS['homeoffice'], 'contra': CONTRA, 'side': 'S', 'number': f'HO{year}',
             'origin': 'confirmed_allowance', 'batch': 'allowances', 'mapping_note': 'Jahrespauschale, kein Geldabfluss.'})
     return {'profile': PROFILE, 'supported_years': list(SUPPORTED_YEARS), 'entries': sorted(entries, key=lambda e: (e['date'], e['ref'])),
-            'issues': sorted(issues, key=lambda e: (e['date'], e['record_ref'])), 'reasons': REASONS,
-            'columns': COLUMNS, 'accounts': ACCOUNTS, 'contra': CONTRA,
-            'text_fields': sorted(TEXT_FIELDS), 'header_text_fields': sorted(HEADER_TEXT_FIELDS)}
+            'issues': sorted(issues, key=lambda e: (e['date'], e['record_ref'])), 'reasons': REASONS}
 
 
 def identifiers(advisor, client):
@@ -129,6 +125,46 @@ def identifiers(advisor, client):
     if not re.fullmatch(r'[1-9][0-9]{0,4}', str(client)):
         raise WorkflowError('Echte DATEV-Mandantennummer des Empfängers erforderlich (1–99999)')
     return int(advisor), int(client)
+
+
+def private_projection(catalog):
+    """CLI only: enrich rows from the encrypted source, never from dashboard HTML."""
+    view = projection(catalog)
+    records = {sha(rid.encode())[:20]: (rid, value['current'])
+               for rid, value in catalog.get('records', {}).items()}
+    for entry in [*view['entries'], *view['issues']]:
+        if entry['record_ref'] not in records: continue  # Non-cash allowance.
+        rid, row = records[entry['record_ref']]
+        base = catalog['records'].get(row.get('original_id'), {}).get('current', row)
+        customer = {}
+        for candidate in (base, row):
+            for section in ('source_record', 'source_detail'):
+                customer.update((candidate.get(section) or {}).get('customerData') or {})
+            customer.update(candidate.get('buyer') or {})
+        if row['kind'] in ('invoice', 'credit_note'):
+            name = customer.get('name') or ' '.join(str(customer.get(k) or '') for k in ('firstName', 'lastName')).strip()
+            if not name: name = customer.get('companyName') or ''
+        else:
+            from autobookkeeping.receipts import supplier
+            name = supplier(row) or supplier(base) or ''
+        number = str(row.get('document_number') or row.get('number') or '')
+        entry.update(record_id=rid, document_number=number, counterparty_name=str(name),
+                     customer_data=customer if row['kind'] in ('invoice', 'credit_note') else {},
+                     documents=list(row.get('documents', [])))
+        if 'number' in entry and re.fullmatch(r'[A-Za-z0-9$&%*+\-/]{1,36}', number):
+            entry['number'] = number
+        if 'batch' in entry:
+            transformations = []
+            for key, value, limit in [('booking_text', name, 60), ('party_info', name, 210),
+                                      ('number_info', number, 210)]:
+                normalized = ' '.join(''.join(' ' if ord(c) < 32 or ord(c) == 127 else c for c in str(value)).split())
+                converted = normalized.encode('cp1252', errors='replace').decode('cp1252')
+                if normalized != str(value) or converted != normalized or len(converted) > limit:
+                    transformations.append(key)
+                entry[key] = converted[:limit]
+            entry['text_adaptations'] = transformations
+            entry['counterparty_missing'] = not bool(str(name).strip())
+    return view
 
 
 def line(values, text_fields):
@@ -153,8 +189,10 @@ def fields(entry):
     result[0] = f"{Decimal(abs(entry['amount_cents'])) / 100:.2f}".replace('.', ',')
     for index, value in {1: entry['side'], 2: 'EUR', 6: entry['account'], 7: entry['contra'],
          9: entry['date'][8:10] + entry['date'][5:7], 10: entry['number'],
-         13: 'EÜR ' + entry['category'] + ' ' + entry['ref'][:8],
+         13: entry.get('booking_text') or 'EÜR ' + entry['category'] + ' ' + entry['ref'][:8],
          20: 'Archiv-Referenz', 21: entry['ref'], 41: 'K', 113: 0}.items(): result[index] = value
+    if entry.get('party_info'): result[22:24] = ['Geschäftspartner', entry['party_info']]
+    if entry.get('number_info'): result[24:26] = ['Original-Belegnummer', entry['number_info']]
     return result
 
 
@@ -186,7 +224,7 @@ def files(snapshot, year, advisor, client, source_sha256, at=None):
         from autobookkeeping.datev_validation import validate
         validate(data)
         result[f'EXTF_{"Pauschalen" if batch == "allowances" else "Buchungsstapel"}_{year}.csv'] = data
-    report = {'version': 1, 'year': year, 'profile': PROFILE, 'source_sha256': source_sha256,
+    report = {'version': 2, 'year': year, 'profile': PROFILE, 'source_sha256': source_sha256,
         'created_at': at, 'advisor': advisor, 'client': client, 'entries': entries, 'excluded': issues,
         'complete_for_recorded_year': not issues, 'is_complete_business_eur': False,
         'income_cents': sum(e['amount_cents'] for e in entries if e['bucket'] == 'income'),
@@ -198,11 +236,15 @@ def files(snapshot, year, advisor, client, source_sha256, at=None):
             'Bruttoaufwand ohne Vorsteuerabzug; keine automatische Reverse-Charge-/Sondersteuerverarbeitung.',
             'Gegenkonto 1371 ist ein neutrales EÜR-Verrechnungskonto, kein Bankabgleich.',
             'Keine Festschreibung beim Import angefordert. Jeder erneute Import kann Doppelbuchungen erzeugen.',
-            'Nummern, SKR03 und Kontenfunktionen müssen zum Empfängerbestand passen. Keine DATEV-Zertifizierung.']}
+            'Nummern, SKR03 und Kontenfunktionen müssen zum Empfängerbestand passen. Keine DATEV-Zertifizierung.',
+            'Geschäftspartner im Buchungstext (60 Zeichen) und Beleginfo (210 Zeichen); keine Debitoren-/Kreditorenstammdaten oder OPOS.',
+            'CP1252-Ersetzungen, Leerraumbereinigung und Kürzungen stehen unter text_adaptations; unveränderte Daten im UTF-8-Bericht und Archiv.',
+            'Fehlende Namen werden als counterparty_missing markiert, nicht erfunden.']}
     result['exportbericht.json'] = encoded(report)
     result['LESEN.txt'] = ('DATEV-Export für Kleinunternehmer-EÜR 2026\r\n\r\n' + '\r\n'.join(report['notes']) +
         f'\r\n\r\n{len(entries)} Exportzeilen, {len(issues)} nicht übernommene Vorgänge.\r\n' +
-        'Auslassungen und Kontenzuordnung: exportbericht.json. Originale sind nicht im ZIP; vollständigen Archivexport bei Bedarf separat erstellen.\r\n' +
+        'Auslassungen und Kontenzuordnung: exportbericht.json. Der CLI-Export enthält unter archiv/ alle Originale, Metadaten und Historien aller Jahre.\r\n' +
+        'ACHTUNG: Personenbezogener Klartext. Geschützt aufbewahren und nur gezielt weitergeben; niemals ins Repository kopieren.\r\n' +
         report['validation']).encode('utf8')
     result['pruefsummen.json'] = encoded({name: sha(data) for name, data in result.items()})
     return result
@@ -211,11 +253,17 @@ def files(snapshot, year, advisor, client, source_sha256, at=None):
 def export(archive, year, advisor, client, output):
     archive.verify(); output = outside(archive.repo, Path(output))
     if output.exists(): raise WorkflowError('Exportordner muss neu sein')
-    data = files(projection(archive.catalog()), year, advisor, client,
+    data = files(private_projection(archive.catalog()), year, advisor, client,
                  sha((archive.root / 'database.json.enc').read_bytes()))
-    buffer = io.BytesIO()
-    with zipfile.ZipFile(buffer, 'w', compression=zipfile.ZIP_STORED) as package:
-        for name, payload in data.items(): package.writestr(name, payload)
-    atomic(output / f'DATEV_Export_{year}.zip', buffer.getvalue())
-    return {'ok': True, 'output': str(output / f'DATEV_Export_{year}.zip'), 'files': list(data),
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix='.datev-export-', dir=output.parent) as temp:
+        package = outside(archive.repo, Path(temp) / 'export')
+        archive.export(package / 'archiv', str(year))
+        for name, payload in data.items(): atomic(package / name, payload)
+        # Include every original and metadata/history file, not just EXTF payloads.
+        hashes = {p.relative_to(package).as_posix(): sha(p.read_bytes())
+                  for p in sorted(package.rglob('*')) if p.is_file() and p != package / 'pruefsummen.json'}
+        atomic(package / 'pruefsummen.json', encoded(hashes))
+        outside(archive.repo, package).rename(outside(archive.repo, output))
+    return {'ok': True, 'output': str(output), 'files': list(data), 'complete_archive_included': True,
             'data_changed': False, 'datev_application_tested': False}

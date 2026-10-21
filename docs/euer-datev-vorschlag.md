@@ -63,8 +63,9 @@ Die Schnittstellenanforderung ist von unserer einfachen Aufzeichnung zu trennen.
 
 Der [DATEV-Exportadapter](datev-export.md) nutzt jetzt ein festgelegtes SKR03-EÜR-Profil
 für 2026 und das neutrale EÜR-Verrechnungskonto 1371. Die Anwendung selbst bleibt
-bei Einnahmen-/Ausgabenkategorien. Im Dashboard entstehen DATEV-CSV und ein
-Begleitbericht als ZIP, ohne Datenbuchung. Echte Zielnummern des Empfängers werden
+bei Einnahmen-/Ausgabenkategorien. Das Dashboard erstellt ausschließlich einen CLI-Befehl. Die CLI exportiert
+DATEV-CSV mit vorhandenen Geschäftspartnernamen sowie einen Begleitbericht und
+das vollständige Klartextarchiv aller Jahre außerhalb beider Repos, ohne Datenbuchung. Echte Zielnummern des Empfängers werden
 im Dialog eingegeben; sie werden nicht geraten. Bekannte Ausnahmen werden separat
 ausgewiesen. Ein Import bloßer EÜR-Zeilensummen in DATEV EÜR Steuern wird weiterhin
 nicht behauptet. Vorhanden sind lokaler Formatprüfer und Browser-/CLI-Vergleich;

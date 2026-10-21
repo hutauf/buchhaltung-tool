@@ -4,12 +4,11 @@ import io
 import json
 import shutil
 import subprocess
-import zipfile
 from pathlib import Path
 import pytest
 
 from autobookkeeping.archive import Archive, sha
-from autobookkeeping.datev_export import projection, files, export, COLUMNS, fields
+from autobookkeeping.datev_export import projection, private_projection, files, export
 from autobookkeeping.datev_validation import validate
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -105,51 +104,75 @@ def test_independent_validator_rejects_malformed_files(mutation):
     with pytest.raises(ValueError):validate(malformed)
 
 
-def test_browser_download_zip_matches_python_csv_and_independent_parser():
+def test_private_data_reaches_extf_and_lossless_report_but_never_dashboard():
+    source=catalog();invoice=source['records']['PRIVATE-INVOICE']['current']
+    name='SYNTHETIC Änne; "Test" '+('Long ' * 45)+'😀'
+    invoice['source_detail']['customerData']={'name':name,'street':'SYNTHETIC STREET','zipCode':'01234'}
+    before=copy.deepcopy(source);view=private_projection(source)
+    data=files(view,2026,'1234','7','0'*64)
+    bookings=list(csv.reader(io.StringIO(data['EXTF_Buchungsstapel_2026.csv'].decode('cp1252')),delimiter=';'))[2:]
+    assert bookings[0][13].startswith('SYNTHETIC Änne; "Test"') and len(bookings[0][13])==60
+    assert bookings[0][22:24]==['Geschäftspartner',name[:210]]
+    assert bookings[1][13]=='PRIVATE SUPPLIER'
+    assert bookings[1][24:26]==['Original-Belegnummer','PRIVATE SUPPLIER NUMBER']
+    note=json.loads(data['exportbericht.json'])
+    sale=next(e for e in note['entries'] if e['record_id']=='PRIVATE-INVOICE')
+    refund=next(e for e in note['entries'] if e['record_id']=='PRIVATE-REFUND')
+    assert sale['counterparty_name']==name and refund['counterparty_name']==name
+    assert sale['customer_data']['street']=='SYNTHETIC STREET' and sale['text_adaptations']
+    assert validate(data['EXTF_Buchungsstapel_2026.csv'])['rows']==5
+    assert name not in json.dumps(projection(source),ensure_ascii=False) and source==before
+
+
+def test_private_supplier_numbers_and_non_cp1252_names_keep_originals():
+    source=catalog();row=source['records']['PRIVATE-EXPENSE']['current']
+    row.update(payee='SYNTHETIC 李😀',number='TEST-RECEIPT/7')
+    view=private_projection(source);entry=next(e for e in view['entries'] if e.get('record_id')==row['id'])
+    assert entry['number']==row['number'] and entry['booking_text']=='SYNTHETIC ??'
+    data=files(view,2026,'1234','7','0'*64)
+    assert row['payee'] in data['exportbericht.json'].decode('utf8')
+    assert entry['text_adaptations']==['booking_text','party_info']
+    assert validate(data['EXTF_Buchungsstapel_2026.csv'])['ok']
+    source['records']['PRIVATE-INVOICE']['current'].pop('source_detail')
+    assert any(e.get('counterparty_missing') for e in private_projection(source)['entries'])
+
+
+def test_long_private_numbers_and_control_characters_are_preserved_in_report():
+    source=catalog();row=source['records']['PRIVATE-EXPENSE']['current']
+    row.update(payee='SYNTHETIC\x00SUPPLIER\r\nName',number='1'*80)
+    view=private_projection(source);entry=next(e for e in view['entries'] if e.get('record_id')==row['id'])
+    assert entry['number'].startswith('B') and len(entry['number'])==21
+    assert entry['booking_text']=='SYNTHETIC SUPPLIER Name' and entry['document_number']=='1'*80
+    data=files(view,2026,'1234','7','0'*64)
+    assert validate(data['EXTF_Buchungsstapel_2026.csv'])['ok']
+    assert next(e for e in json.loads(data['exportbericht.json'])['entries']
+                if e.get('record_id')==row['id'])['counterparty_name']==row['payee']
+
+
+def test_dashboard_only_builds_cli_command_and_clears_inputs():
     node=shutil.which('node')
     if not node:pytest.skip('Node required')
     source=(ROOT/'scripts/dashboard_view.html').read_text(encoding='utf8')
-    script='function datevLine'+source.split('function datevLine',1)[1].split('function datevDownload',1)[0]
-    snapshot=projection(with_allowance(catalog()));at='20261021123456000'
-    program=r"""
-const vm=require('vm'),fs=require('fs'),assert=require('assert'),input=JSON.parse(fs.readFileSync(0,'utf8'));
-const context={TextEncoder,Uint8Array,DataView,crypto:require('crypto').webcrypto};vm.createContext(context);vm.runInContext(input.script,context);
-(async()=>{
- for(const args of [['','7'],['1234','0']])await assert.rejects(context.makeDatevFiles(input.snapshot,2026,...args,'0'.repeat(64),input.at));
- const files=await context.makeDatevFiles(input.snapshot,2026,'1234','7','0'.repeat(64),input.at);
- process.stdout.write(Buffer.from(context.datevZip(files)).toString('base64'));
-})().catch(e=>{console.error(e);process.exitCode=1});
-"""
-    result=subprocess.run([node,'-e',program],input=json.dumps({'script':script,'snapshot':snapshot,'at':at}).encode(),capture_output=True,check=True,timeout=20)
-    import base64
-    with zipfile.ZipFile(io.BytesIO(base64.b64decode(result.stdout))) as archive:
-        assert archive.testzip() is None
-        expected=files(snapshot,2026,'1234','7','0'*64,at)
-        for name in ('EXTF_Buchungsstapel_2026.csv','EXTF_Pauschalen_2026.csv'):
-            actual=archive.read(name);assert actual==expected[name];assert validate(actual)['ok']
-        hashes=json.loads(archive.read('pruefsummen.json'));assert all(sha(archive.read(name))==digest for name,digest in hashes.items())
-        note=json.loads(archive.read('exportbericht.json'));assert note['income_cents']==8000 and note['allowance_cents']==126000
-
-
-def test_dashboard_export_dialog_checks_target_ids_and_clears_them_on_close():
-    node=shutil.which('node')
-    if not node:pytest.skip('Node required')
-    source=(ROOT/'scripts/dashboard_view.html').read_text(encoding='utf8')
-    script='function datevLine'+source.split('function datevLine',1)[1].split("$('basis').textContent",1)[0]
+    assert 'makeDatevFiles' not in source and 'datev-download' not in source and 'datevZip' not in source
+    script='function datevSelection'+source.split('function datevSelection',1)[1].split("$('basis').textContent",1)[0]
     program=r"""
 const fs=require('fs'),vm=require('vm'),assert=require('assert'),input=JSON.parse(fs.readFileSync(0,'utf8'));
-const controls={},blobs=[],$=id=>controls[id]||(controls[id]={value:'',events:{},addEventListener(e,f){this.events[e]=f},showModal(){this.open=true},close(){this.open=false;this.events.close?.()}});
+const controls={},copied=[],$=id=>controls[id]||(controls[id]={value:'',events:{},addEventListener(e,f){this.events[e]=f},showModal(){this.open=true},close(){this.open=false;this.events.close?.()}});
 $('year').value='2026';$('datev-year').value='2026';
-const context={$,DATA:{datev_export:input.snapshot,source_sha256:'0'.repeat(64)},esc:String,python:'buchhaltung ',psQuote:v=>"'"+v.replace(/'/g,"''")+"'",
- TextEncoder,Uint8Array,DataView,Blob,crypto:require('crypto').webcrypto,URL:{createObjectURL(b){blobs.push(b);return 'blob:synthetic'},revokeObjectURL(){}},
- setTimeout(){},document:{createElement(){return {click(){}}}}};
+const context={$,DATA:{datev_export:input.snapshot},esc:String,python:'buchhaltung ',psQuote:v=>"'"+v.replace(/'/g,"''")+"'",
+ navigator:{clipboard:{async writeText(text){copied.push(text)}}}};
 vm.createContext(context);vm.runInContext(input.script,context);
 (async()=>{
  $('open-datev').onclick();assert($('datev-dialog').open);assert($('datev-summary').textContent.includes('5 Zahlungszeilen'));
- await $('datev-download').onclick();assert.strictEqual(blobs.length,0);assert($('datev-result').textContent.includes('Beraternummer'));
- $('datev-advisor').value='1234';$('datev-client').value='7';await $('datev-download').onclick();
- assert.strictEqual(blobs.length,1);assert($('datev-result').textContent.includes('heruntergeladen'));
- $('datev-dialog').close();assert.strictEqual($('datev-advisor').value,'');assert.strictEqual($('datev-client').value,'');
+ assert($('datev-copy').disabled);await $('datev-copy').onclick();assert.strictEqual(copied.length,0);
+ $('datev-advisor').value='1000';$('datev-client').value='7';$('datev-output').value="SYNTHETIC O'Brien";
+ context.renderDatevSummary();assert($('datev-copy').disabled);
+ $('datev-advisor').value='1234';context.renderDatevSummary();assert(!$('datev-copy').disabled);
+ await $('datev-copy').onclick();assert.strictEqual(copied.length,1);
+ assert(copied[0].includes("--advisor '1234' --client '7' --output 'SYNTHETIC O''Brien'"));
+ context.navigator.clipboard.writeText=async()=>{throw Error('unavailable')};await $('datev-copy').onclick();
+ assert($('datev-result').textContent.includes('markieren und kopieren'));
+ $('datev-dialog').close();for(const id of ['datev-advisor','datev-client','datev-output'])assert.strictEqual($(id).value,'');
  assert.strictEqual($('datev-cli').textContent,'');
 })().catch(e=>{console.error(e);process.exitCode=1});
 """
@@ -163,13 +186,32 @@ def test_read_only_export_outside_repo_without_publication(tmp_path,monkeypatch)
     pdf=tmp_path/'synthetic.pdf';pdf.write_bytes(b'%PDF-1.4 SYNTHETIC')
     metadata=tmp_path/'synthetic.json';metadata.write_text(json.dumps(dict(source='synthetic',source_id='expense',kind='expense',
         date='2026-01-02',pay_date='2026-01-02',currency='EUR',gross='3.00',net='3.00',vat='0.00',vat_rate=0,
-        category='postage',status='recorded')),encoding='utf8')
+        category='postage',status='recorded',payee='SYNTHETIC SUPPLIER')),encoding='utf8')
     archive.import_local(metadata,[pdf])
+    old=tmp_path/'old.json';old.write_text(json.dumps(dict(source='synthetic',source_id='older',kind='expense',
+        date='2011-01-01',pay_date='2011-01-01',currency='EUR',gross='1.00',net='1.00',vat='0.00',vat_rate=0,
+        category='postage',status='recorded',payee='SYNTHETIC HISTORICAL SUPPLIER')),encoding='utf8')
+    archive.import_local(old,[pdf])
     before={p.relative_to(root):p.read_bytes() for p in root.rglob('*') if p.is_file()}
     from autobookkeeping.publication import Publication
     monkeypatch.setattr(Publication,'__enter__',lambda self:pytest.fail('Export must not publish'))
     result=export(archive,2026,'1234','7',tmp_path/'export')
     assert result['data_changed'] is False and not result['datev_application_tested']
-    with zipfile.ZipFile(result['output']) as package:assert validate(package.read('EXTF_Buchungsstapel_2026.csv'))['rows']==1
+    folder=Path(result['output'])
+    assert validate((folder/'EXTF_Buchungsstapel_2026.csv').read_bytes())['rows']==1
+    complete=json.loads((folder/'archiv/catalog.json').read_bytes())
+    assert len(complete['records'])==2 and b'SYNTHETIC HISTORICAL SUPPLIER' in (folder/'archiv/catalog.json').read_bytes()
+    assert any(p.read_bytes()==pdf.read_bytes() for p in (folder/'archiv').rglob('*.pdf'))
+    assert 'SYNTHETIC SUPPLIER' in (folder/'EXTF_Buchungsstapel_2026.csv').read_text(encoding='cp1252')
+    hashes=json.loads((folder/'pruefsummen.json').read_bytes())
+    assert all(sha((folder/name).read_bytes())==digest for name,digest in hashes.items())
+    assert 'archiv/catalog.json' in hashes and not list(folder.rglob('*.zip'))
+    with pytest.raises(ValueError):export(archive,2026,'1234','7',folder)
+    def fail_export(target,year):
+        target.mkdir(parents=True);(target/'partial').write_text('SYNTHETIC')
+        raise ValueError('synthetic interrupted export')
+    monkeypatch.setattr(archive,'export',fail_export)
+    with pytest.raises(ValueError,match='interrupted'):export(archive,2026,'1234','7',tmp_path/'interrupted')
+    assert not (tmp_path/'interrupted').exists() and not list(tmp_path.glob('.datev-export-*'))
     assert before=={p.relative_to(root):p.read_bytes() for p in root.rglob('*') if p.is_file()}
     with pytest.raises(ValueError):export(archive,2026,'1234','7',root/'output')

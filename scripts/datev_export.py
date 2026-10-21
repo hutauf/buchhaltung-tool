@@ -13,7 +13,7 @@ from autobookkeeping.workspace import data_root
 
 
 def main():
-    parser = argparse.ArgumentParser(description='DATEV-CSV mit Begleitbericht als ZIP exportieren; keine Buchung')
+    parser = argparse.ArgumentParser(description='DATEV-CSV mit Namen und vollständigem Archiv außerhalb der Repos exportieren; keine Buchung')
     parser.add_argument('--year', type=int, required=True)
     parser.add_argument('--advisor', required=True, help='Echte Beraternummer des DATEV-Empfängers')
     parser.add_argument('--client', required=True, help='Echte Mandantennummer des DATEV-Empfängers')
