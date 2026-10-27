@@ -2,6 +2,11 @@
 
 ## Unveröffentlicht
 
+- Fehlerhafte erfasste Ausgaben mit Freigabe und Grund ungültig erklären: Originale,
+  Quelldaten, Zahlungsinformationen und Historien bleiben erhalten. Eigener
+  verschlüsselter Vermerk bleibt bei Quellaktualisierungen bestehen; keine EÜR-
+  oder DATEV-Buchungswirkung. Dashboardstatus und geführter CLI-Befehl, vollständiger
+  Vermerk in lokalen Metadaten/Exporten. Verfahrensbeschreibung Version 13.
 - DATEV ausschließlich per CLI: Dashboard erstellt den Befehl statt Downloads.
   Geschäftspartnernamen in EXTF-Buchungstext und Beleginformationen; vollständige
   Personenmetadaten, Historien und Originale aller Jahre im Begleitarchiv außerhalb

@@ -23,7 +23,8 @@ def report(catalog, year):
     for rid, versions in catalog['records'].items():
         row = versions['current']
         flows, warnings = document_flows(catalog, row)
-        if row.get('coverage') != 'complete': warnings.append('Originalbeleg fehlt')
+        invalidation = catalog.get('expense_invalidations', {}).get(rid)
+        if row.get('coverage') != 'complete' and not invalidation: warnings.append('Originalbeleg fehlt')
         flows = [flow for flow in flows if flow['date'].startswith(year + '-')]
         if not str(row.get('date') or '').startswith(year + '-') and not flows: continue
         selected[rid] = {'record_id': rid, 'kind': row['kind'], 'number': row.get('document_number') or row.get('number'),
@@ -33,6 +34,8 @@ def report(catalog, year):
             'coverage': row.get('coverage'), 'tax_treatment': row.get('tax_treatment'),
             'flows': flows, 'warnings': warnings, 'history_versions': len(versions['history']),
             'tax_assignment_open': bool(row.get('tax_review_required') or row.get('business_use') in ('mixed', 'unclear'))}
+        if invalidation:
+            selected[rid].update(status='invalidated', invalidation=invalidation, tax_assignment_open=False)
     cases = [case for case in findings(catalog) if str(case['row'].get('created_at') or '').startswith(year + '-')
              or str(case['row'].get('paid_at') or '').startswith(year + '-')
              or any(rid in selected for rid in case['row']['record_ids'])]

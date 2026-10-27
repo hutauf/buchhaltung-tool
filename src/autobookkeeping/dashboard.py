@@ -69,6 +69,9 @@ def projection(catalog: dict, source_digest: str) -> dict:
         if row.get("currency", "EUR") != "EUR":
             raise ValueError("Fremdwährungsbestand benötigt eine gesonderte Auswertung")
         status=row["status"]
+        from autobookkeeping.invalidations import invalidated
+        is_invalid = invalidated(catalog, rid)
+        if is_invalid: status='invalidated'
         if kind=="invoice" and fully_cancelled(catalog,rid):
             status="locally_cancelled"
         elif kind=="invoice" and any(v["current"].get("original_id")==rid and v["current"].get("kind")=="credit_note" for v in catalog["records"].values()):
@@ -84,12 +87,13 @@ def projection(catalog: dict, source_digest: str) -> dict:
             except (ValueError,ArithmeticError):
                 warnings.append("Belegbetrag unvollständig");return None
         gross=monetary("gross"); effect=gross
+        if is_invalid: effect=0
         if kind in ("draft","correction") or (kind=="invoice" and row["status"] in ("cancelled","draft")):
             effect=0
         rates=row.get("vat_rates") or ([row["vat_rate"]] if row.get("vat_rate") is not None else []) or sorted({g["vat_rate"] for g in row.get("vat_breakdown",[]) if type(g.get("vat_rate")) in (int,float)})
         exempt = kind in ("invoice", "credit_note", "draft") and (row.get("small_business") is True or (row.get("source_detail") or {}).get("smallBusiness") is True)
         tax_treatment = "small_business_exempt" if exempt else "domestic_vat" if row.get("tax_treatment")=="domestic_vat" else "source_unspecified"
-        if row.get("coverage")!="complete" and kind!="draft":
+        if row.get("coverage")!="complete" and kind!="draft" and not is_invalid:
             warnings.append("Originalbeleg fehlt")
         # No free text, buyer, supplier, product, external IDs, order/tracking, filenames or source blobs.
         result={"ref":sha(rid.encode())[:20],"date":public_day(row.get("date")),
@@ -97,7 +101,7 @@ def projection(catalog: dict, source_digest: str) -> dict:
                 "proposed_number":public_number(proposal),
                 "document_type":row.get("document_type") if row.get("document_type") in ("invoice","cancellation","partial_refund","correction","expense","supplier_credit") else "invoice" if section == "local_invoice_drafts" else kind,
                 "related_number":public_number(row.get("original_number")),"status":status if status in
-                    ("paid","issued","recorded","cancelled","locally_cancelled","partially_credited","test_draft","draft") else "other",
+                    ("paid","issued","recorded","cancelled","locally_cancelled","partially_credited","test_draft","draft","invalidated") else "other",
                 "gross_cents":gross,"net_cents":monetary("net"),"vat_cents":monetary("vat"),
                 "vat_rates":[float(r) for r in rates if isinstance(r,(int,float)) and 0<=r<=100],
                 "tax_treatment":tax_treatment,

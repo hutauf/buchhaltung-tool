@@ -28,6 +28,9 @@ def cents(value) -> int:
 
 def document_flows(catalog: dict, row: dict) -> tuple[list[dict], list[str]]:
     rid=row["id"]; flows=[]; warnings=[]
+    from autobookkeeping.invalidations import invalidated
+    if invalidated(catalog, rid):
+        return [], ['Ausgabe nachvollziehbar für ungültig erklärt; nicht in EÜR berücksichtigt']
     def append(value, when, reference, origin, bucket):
         try:
             amount=cents(value); day=payment_day(when)
@@ -103,6 +106,9 @@ def record_cash(workflow, payload: dict, approved: bool) -> dict:
         raise WorkflowError("Zahlungsbewegung darf nicht null sein")
     workflow.archive.verify();before=workflow.archive.catalog();after=copy.deepcopy(before)
     row=after["records"][payload["record_id"]]["current"]
+    from autobookkeeping.invalidations import invalidated
+    if invalidated(before, row['id']):
+        raise WorkflowError('Ungültige Ausgabe kann keine neue Zahlungszuordnung erhalten')
     if row["kind"] not in ("invoice","expense","expense_credit","credit_note") or row.get("status") in ("draft","test_draft") or row.get("currency","EUR")!="EUR":
         raise WorkflowError("Zahlungszuordnung benötigt einen echten EUR-Beleg")
     if row.get("source")=="local" and row["kind"]=="invoice" and amount<0:

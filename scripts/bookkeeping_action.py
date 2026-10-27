@@ -28,6 +28,12 @@ def resolve(catalog, reference):
 def command(args, section, row):
     rid = row["id"]
     interactive=getattr(args,'interactive',False)
+    if args.action == 'expense-invalidate':
+        if section!='records' or row['kind']!='expense':
+            raise WorkflowError('Bereits erfasste Originalausgabe erforderlich')
+        if interactive: return ['receipt.py','invalidieren',rid,'--interactive']
+        if not args.reason: raise WorkflowError('Begründung erforderlich; --interactive verwenden')
+        return ['receipt.py','invalidieren',rid,'--reason',args.reason,'--approved']
     if args.action == 'supplier-credit-inspect':
         if section!='records' or row['kind']!='expense' or not args.file:
             raise WorkflowError('Originalausgabe und Pfad zum Lieferanten-Korrekturbeleg erforderlich')
@@ -68,9 +74,10 @@ def command(args, section, row):
 def main():
     data_root()
     parser = argparse.ArgumentParser(description="Lokale Aktion aus einem geprüften Dashboard-Stand")
-    parser.add_argument("action", choices=("show", "preview", "finish", "discard", "dhl-expense", "cancel-prepare", "refund-prepare", "correct-prepare", "payments", "supplier-credit-inspect"))
+    parser.add_argument("action", choices=("show", "preview", "finish", "discard", "dhl-expense", "cancel-prepare", "refund-prepare", "correct-prepare", "payments", "supplier-credit-inspect", "expense-invalidate"))
     parser.add_argument("--ref", required=True); parser.add_argument("--snapshot", required=True)
     parser.add_argument("--number"); parser.add_argument("--metadata", type=Path); parser.add_argument("--output", type=Path)
+    parser.add_argument('--reason')
     parser.add_argument('--file',type=Path)
     parser.add_argument("--e-invoice", action="store_true", help="Archivierte Rechnungs-XML zusätzlich ansehen")
     parser.add_argument('--interactive',action='store_true',help='Geprüfte Angaben im Terminal erfassen; keine JSON-Datei nötig')
@@ -81,7 +88,8 @@ def main():
         if sha((archive.root / "database.json.enc").read_bytes()) != args.snapshot: raise WorkflowError("Dashboard veraltet; neu erzeugen und aktuellen Befehl verwenden")
         catalog = archive.catalog(); section, row = resolve(catalog, args.ref); args.catalog = catalog
     if args.action == "show":
-        print(json.dumps({"ok": True, "record": row}, ensure_ascii=False, indent=2)); return 0
+        print(json.dumps({"ok": True, "record": row,
+                         "expense_invalidation": catalog.get('expense_invalidations',{}).get(row['id'])}, ensure_ascii=False, indent=2)); return 0
     if args.action == "preview" and section == "records" and row["kind"] not in ("expense","expense_credit"):
         if not args.output: raise WorkflowError("Neuen Ausgabeordner außerhalb des Repos angeben")
         target = outside(ROOT, args.output)
@@ -96,6 +104,8 @@ def main():
         print(json.dumps({"ok": True, "output": str(target)}, ensure_ascii=False)); return 0
     if args.action in ("finish", "payments", "dhl-expense") and not args.approved and not (args.action=='payments' and args.interactive):
         raise WorkflowError("Konkreter Abschluss/Zahlung benötigt --approved")
+    if args.action=='expense-invalidate' and not args.interactive and not args.approved:
+        raise WorkflowError('Ungültigerklären benötigt konkrete Freigabe oder --interactive')
     environment = dict(os.environ, BOOKKEEPING_EXPECTED_SNAPSHOT=args.snapshot)
     if args.action == "payments":
         if args.interactive:

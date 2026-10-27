@@ -353,6 +353,10 @@ class Archive:
         for row in rows:
             row = dict(row)
             row["documents"] = [name[:-4] for name in row["documents"]]
+            if row['id'] in catalog.get('expense_invalidations', {}):
+                row['source_status'] = row['status']
+                row['status'] = 'invalidated'
+                row['invalidation'] = catalog['expense_invalidations'][row['id']]
             exported.append(row)
         atomic(target / 'catalog.json', encoded(catalog))
         from autobookkeeping.inspection_export import write_tables

@@ -271,3 +271,13 @@ Neue eigene Rechnungen und der geplante EÜR-Zuordnungsvorschlag sind auf Kleinu
 ## DATEV-Export
 
 Oben im Dashboard **DATEV-Export** wählen, das Jahr 2026, die echten Berater-/Mandantennummern der empfangenden Kanzlei und einen neuen Zielordner außerhalb beider Repos angeben. Den angezeigten Befehl kopieren und im Toolordner ausführen. Ausschließlich die CLI exportiert: DATEV-CSV mit vorhandenen Kunden-/Lieferantennamen, Begleitbericht und vollständiges Klartextarchiv aller Jahre einschließlich Originalen, Anschriften und Metadatenhistorien. Kein Browserdownload und keine ZIP-Datei. Den personenbezogenen Export geschützt aufbewahren und gezielt weitergeben. [Umfang, Konten und Prüfung](datev-export.md). Befehl: `buchhaltung datev --year 2026 --advisor ECHTE_BERATERNUMMER --client ECHTE_MANDANTENNUMMER --output NEUER_ORDNER_AUSSERHALB`. Nur Leseexport, keine Buchung, kein Commit und kein neuer Bitcoin-Nachweis. Kein zugesicherter direkter Import in DATEV EÜR Steuern.
+
+## Fehlerhafte Ausgabe ungültig erklären
+
+Im Dashboard unter den Aktionen einer Ausgabe **Fehlerhafte Ausgabe ungültig erklären** wählen und den CLI-Befehl im Toolordner ausführen. Das Terminal zeigt den betroffenen Datensatz, fragt nach der Begründung und verlangt die konkrete Bestätigung. Alternativ für bereits geprüfte Einträge:
+
+```powershell
+buchhaltung beleg invalidieren AUSGABEN_ID --reason 'Konkreter Fehler und Ausschlussgrund' --approved
+```
+
+Mehrere IDs sind möglich. Die Änderung wird automatisch im privaten Datenrepo veröffentlicht und zeitlich belegt. Der ursprüngliche Eintrag samt Originalen bleibt erhalten. Der Status erscheint als **Ungültig · nicht berücksichtigt**; EÜR und DATEV-Buchungen berücksichtigen ihn nicht mehr. Diese Kennzeichnung ist keine Erstattung und keine automatische Änderung einer früheren Steuererklärung. Vollständige Gründe stehen lokal bei **Metadaten ansehen** sowie im Archiv-/Jahresbericht. Ein erneuter Quellimport hebt die Kennzeichnung nicht auf. Verknüpfte Lieferanten-Korrekturen zuerst gesondert klären.

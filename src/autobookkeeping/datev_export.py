@@ -43,6 +43,7 @@ COLUMNS = ('Umsatz (ohne Soll/Haben-Kz);Soll/Haben-Kennzeichen;WKZ Umsatz;Kurs;B
 TEXT_FIELDS = {1, 2, 10, 13, 20, 21, 22, 23, 24, 25, 41}
 HEADER_TEXT_FIELDS = {0, 3, 7, 8, 9, 16, 17, 21, 23, 26, 29, 30}
 REASONS = {
+    'invalidated': 'Ausgabe mit Begründung für ungültig erklärt; keine Buchungsübernahme.',
     'tax_scope': 'Kleinunternehmer-Steuerstatus fehlt oder widerspricht den Beträgen.',
     'special_tax': 'Steuerlicher Sonderfall oder ausländischer Eingangsbeleg nicht automatisch kontiert.',
     'private_share': 'Betrieblicher Anteil ist ungeklärt.',
@@ -66,6 +67,14 @@ def projection(catalog):
     for rid, versions in catalog.get('records', {}).items():
         row = versions['current']; kind = row['kind']
         if kind == 'correction' or row.get('status') in ('draft', 'test_draft'): continue
+        invalidation = catalog.get('expense_invalidations', {}).get(rid)
+        if invalidation:
+            original_flows = invalidation.get('cash_flows_at_invalidation') or [
+                {'date': str(row.get('date') or '')[:10], 'ref': None, 'amount_cents': None}]
+            for flow in original_flows:
+                issues.append({'record_ref': sha(rid.encode())[:20], 'date': flow['date'],
+                               'flow_ref': flow['ref'], 'amount_cents': flow['amount_cents'], 'reason': 'invalidated'})
+            continue
         flows, warnings = document_flows(catalog, row)
         base = catalog.get('records', {}).get(row.get('original_id'), {}).get('current', row)
         buyer_country = (base.get('buyer') or {}).get('country_iso') or (
@@ -151,6 +160,8 @@ def private_projection(catalog):
         entry.update(record_id=rid, document_number=number, counterparty_name=str(name),
                      customer_data=customer if row['kind'] in ('invoice', 'credit_note') else {},
                      documents=list(row.get('documents', [])))
+        if rid in catalog.get('expense_invalidations', {}):
+            entry['invalidation'] = catalog['expense_invalidations'][rid]
         if 'number' in entry and re.fullmatch(r'[A-Za-z0-9$&%*+\-/]{1,36}', number):
             entry['number'] = number
         if 'batch' in entry:

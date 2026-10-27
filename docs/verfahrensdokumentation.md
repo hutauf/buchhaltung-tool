@@ -1,6 +1,6 @@
 # Verfahrensdokumentation der lokalen Belegablage
 
-Version 12 · Technikstand 21.10.2026, rechtliche Grundlagen zuletzt geprüft am 21.10.2026. Sicherheitsbeschreibung mit Implementierung und OpenTimestamps-Primärdokumentation am 19.10.2026 abgeglichen. Änderungen dieser Beschreibung werden mit der Toolhistorie versioniert. Die im privaten Workspace verwendete Toolrevision steht in `tool-version.json`.
+Version 13 · Technikstand 27.10.2026, rechtliche Grundlagen zuletzt geprüft am 21.10.2026. Sicherheitsbeschreibung mit Implementierung und OpenTimestamps-Primärdokumentation am 19.10.2026 abgeglichen. Änderungen dieser Beschreibung werden mit der Toolhistorie versioniert. Die im privaten Workspace verwendete Toolrevision steht in `tool-version.json`.
 
 ## 1. Allgemeine Beschreibung
 
@@ -106,6 +106,16 @@ Die zentrale Schreibfunktion erlaubt bei Originaldateien ausschließlich das ern
 UBL 2.1 und unterstützte CII-D16B-XML werden ohne externe Validatorübertragung verarbeitet. XML-Parser verbieten DTD/Entities und Netzwerkzugriff. Die XSDs stammen aus der festgelegten `factur-x`-Abhängigkeit. CEN-Regeln sind unverändert mit Version und SHA256 enthalten; Prüfergebnisse nennen Regeln/Fehlerkennungen und Validierungsgrenzen. Nationale CIUS-Regeln werden nicht geprüft. [CEN-EN16931-Validierungsartefakte, Release 1.3.16](https://github.com/ConnectingEurope/eInvoicing-EN16931/releases/tag/validation-1.3.16).
 
 Eingebettete Original-XML wird bytegleich zusätzlich zum empfangenen PDF archiviert. Eigene XML und PDF sind getrennte Originaldateien desselben Vorgangs. Auch E-Rechnungsdaten und wesentliche Anhänge müssen erhalten bleiben. [BMF: GoBD-Änderung vom 14.07.2025](https://www.bundesfinanzministerium.de/Content/DE/Downloads/BMF_Schreiben/Weitere_Steuerthemen/Abgabenordnung/2025-07-14-GoBD-2-aenderung.pdf?__blob=publicationFile&v=2).
+
+### Fehlerhafte Ausgaben nachvollziehbar für ungültig erklären
+
+Bereits erfasste fehlerhafte Ausgaben lassen sich mit `beleg invalidieren ID --reason GRUND --approved` oder dem interaktiven Dashboard-Befehl für ungültig erklären. Eine konkrete Freigabe und Begründung sind erforderlich; mehrere eindeutig benannte Ausgaben können gemeinsam verarbeitet werden. Verknüpfte Lieferanten-Minderungsbelege müssen zuvor gesondert geklärt werden. Dies ist eine interne Kennzeichnung, keine Lieferanten-Stornorechnung und keine tatsächliche Rückzahlung.
+
+Die verschlüsselte Sammlung `expense_invalidations` erhält den aktuellen Zeitpunkt, die Begründung, den damaligen vollständigen Datensatz mit Prüfsumme und die zuvor ausgewerteten Zahlungsinformationen. Quelldatensatz, ursprüngliche Status-/Betragsangaben, Originale, frühere Zahlungen und Historien werden nicht gelöscht oder überschrieben. Die getrennte Kennzeichnung bleibt bei späteren Aktualisierungen der Quelldaten erhalten. Eine bereits bestehende Begründung wird durch Wiederholung nicht ersetzt.
+
+Ungültige Ausgaben bleiben im Dashboard mit dem Status „Ungültig · nicht berücksichtigt“ sichtbar und filterbar. Ihre Zahlungsbewegungen und Belegsalden gehen nicht in EÜR-Summen, Grafiken oder DATEV-Buchungen ein. DATEV weist den Ausschluss als `invalidated` aus; der vollständige Archivexport und Jahresbericht erhalten die Kennzeichnung samt Begründung. Die anonymisierte HTML-Datei enthält den Status, aber keine private Begründung. Der Metadatenbefehl zeigt die vollständige Kennzeichnung lokal an. Fehlende Originale dieser ausdrücklich ausgeschlossenen Einträge erscheinen nicht als offene Nachreichaufgabe. Neue Zahlungszuordnungen und Lieferanten-Korrekturen an einer ungültigen Ausgabe sind gesperrt.
+
+Die Änderung durchläuft Archivprüfung, Änderungsprotokoll, Datencommit/Push und einen gesonderten OTS-Nachweis. Die Kennzeichnung behauptet weder eine frühere steuerliche Behandlung noch eine nachträgliche Änderung einer abgegebenen Steuererklärung. Sie erhält den ursprünglichen Inhalt und macht den späteren Eingriff erkennbar, entsprechend [§ 146 Abs. 4 AO](https://www.gesetze-im-internet.de/ao_1977/__146.html) (für diesen Ablauf am 27.10.2026 geprüft).
 
 ### DATEV-Export ohne Archivänderung
 

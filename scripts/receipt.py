@@ -32,6 +32,9 @@ def main():
     p=sub.add_parser("book",help="Genau die freigegebene Metadatenrevision als Ausgabe buchen")
     p.add_argument("id");p.add_argument("--revision",required=True);p.add_argument("--approved",action="store_true")
     p=sub.add_parser("discard");p.add_argument("id")
+    p=sub.add_parser('invalidieren',help='Fehlerhafte erfasste Ausgaben nachvollziehbar ausschließen; keine Löschung oder Rückzahlung')
+    p.add_argument('ids',nargs='+');p.add_argument('--reason');p.add_argument('--interactive',action='store_true')
+    p.add_argument('--approved',action='store_true')
     args=parser.parse_args();data_root();(ROOT/"output").mkdir(exist_ok=True)
     if args.command=='neu':
         base=Path(os.environ.get('LOCALAPPDATA') or Path.home()/'.cache')/'BuchhaltungTool'/'belegpruefung'
@@ -47,7 +50,20 @@ def main():
             payload=guided.receipt(json.loads(template.read_bytes()))
             from autobookkeeping.archive import atomic,encoded,outside
             args.metadata=outside(ROOT,args.review.parent/'metadaten-geprueft.json');atomic(args.metadata,encoded(payload))
-    with Publication(ROOT, "receipt " + args.command, enabled=args.command in ['prepare', 'book', 'discard']) as publication:
+    if args.command=='invalidieren' and args.interactive:
+        from autobookkeeping.archive import encoded,sha
+        with FileLock(ROOT/'output/archive.lock',timeout=0):
+            archive=Archive(ROOT);archive.verify();reviewed=archive.catalog()
+            args.reviewed_sha256=sha(encoded(reviewed))
+            for rid in args.ids:
+                row=reviewed.get('records',{}).get(rid,{}).get('current',{})
+                if row.get('kind')!='expense':raise WorkflowError('Erfasste Originalausgabe erforderlich')
+                from autobookkeeping.receipts import supplier
+                print(rid, row.get('date'), row.get('gross'), row.get('currency'), supplier(row))
+        args.reason=input('Begründung für das Ungültigerklären: ').strip()
+        print('Betroffene Ausgaben:', ', '.join(args.ids), '\nBegründung:', args.reason)
+        args.approved=input('Diese Ausgaben ungültig erklären? FREIGEBEN eingeben: ').strip()=='FREIGEBEN'
+    with Publication(ROOT, "receipt " + args.command, enabled=args.command in ['prepare', 'book', 'discard', 'invalidieren']) as publication:
         with FileLock(ROOT/"output/archive.lock",timeout=0):
             workflow=LocalInvoices(Archive(ROOT));receipts=Receipts(workflow)
             if workflow.journal.exists():raise WorkflowError("Offene Archivtransaktion zuerst mit local_invoice.py recover abschließen")
@@ -58,6 +74,11 @@ def main():
             elif args.command=="prepare":result=receipts.prepare(args.review,args.metadata)
             elif args.command=="book":result=receipts.book(args.id,args.revision,args.approved)
             elif args.command=="discard":result=receipts.discard(args.id)
+            elif args.command=='invalidieren':
+                from autobookkeeping.invalidations import invalidate
+                if args.interactive and sha(encoded(workflow.archive.catalog()))!=args.reviewed_sha256:
+                    raise WorkflowError('Bestand nach Prüfung geändert; erneut prüfen und freigeben')
+                result=invalidate(workflow,args.ids,args.reason,args.approved)
             else:
                 receipts.archive.verify();drafts=receipts.archive.catalog().get("local_expense_drafts",{})
                 result=receipts.summary(drafts[args.id]["current"]) if args.command=="show" else {

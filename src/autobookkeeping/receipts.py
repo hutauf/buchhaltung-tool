@@ -154,6 +154,9 @@ def check_credit(catalog, metadata):
     if metadata.get('document_type') != 'supplier_credit':
         return None
     original = catalog.get('records', {}).get(metadata['original_id'], {}).get('current', {})
+    from autobookkeeping.invalidations import invalidated
+    if invalidated(catalog, metadata['original_id']):
+        raise WorkflowError('Ungültige Ausgabe kann keine neue Lieferanten-Korrektur erhalten')
     if original.get('kind') != 'expense' or original.get('status') in ('draft','test_draft','cancelled'):
         raise WorkflowError('Lieferanten-Korrektur benötigt eine bereits erfasste Originalausgabe')
     if not supplier(original) or normalized(supplier(original)) != normalized(metadata['payee']):
