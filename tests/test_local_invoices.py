@@ -137,6 +137,27 @@ def test_manual_invoice_without_services_has_no_invented_payment(workspace):
     assert document_flows(archive.catalog(),archive.catalog()['records'][corrected['id']]['current'])[0]==[]
 
 
+def test_manual_anonymous_pickup_does_not_invent_buyer_data(workspace):
+    archive, workflow, _, _ = workspace
+    payload = {
+        'reference': 'SYNTHETIC-ANONYMOUS-PICKUP',
+        'verification_basis': 'Synthetic WhatsApp pickup sale',
+        'anonymous_pickup': True,
+        'buyer': {
+            'name': 'Privatkunde (Abholung)', 'street': '', 'postal_code': '', 'city': '',
+            'country': 'Deutschland', 'country_iso': 'DE',
+        },
+        'delivery_date': '2011-01-10',
+        'positions': [{'title': 'SYNTHETIC PICKUP ITEM', 'quantity': 1, 'unit_gross': '9.00'}],
+    }
+    draft = workflow.prepare_manual(payload)
+    assert draft['gross'] == '9.00'
+    text = '\n'.join(p.extract_text() for p in PdfReader(io.BytesIO(archive.read(draft['documents'][0]))).pages)
+    assert 'Privatkunde (Abholung)' in text
+    assert 'Keine Käuferanschrift angegeben' in text
+    assert '00000' not in text
+
+
 def test_unconfigured_vine_is_optional_but_failed_checks_are_not_ignored(workspace):
     _,workflow,order,checks=workspace
     draft=workflow.prepare(order,dict(checks,vine_checked=False,vine_status='not_configured'))

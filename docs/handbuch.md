@@ -243,7 +243,7 @@ Ohne Windows-Unterstützung langer Pfade einen kurzen Testpfad wie `C:\bk1` verw
 
 - `buchhaltung beleg neu PFAD`: Original lesen, Metadaten im Dialog prüfen und als Entwurf vormerken; danach separat freigeben.
 - `buchhaltung beleg prepare REVIEW_JSON --interactive`: bereits erzeugte Prüfkopie im Dialog ergänzen.
-- `buchhaltung rechnung manual-prepare --interactive`: manueller Verkaufsentwurf ohne eBay/DHL/Vine; eindeutige eigene Referenz verwenden. Bei Regelbesteuerung zusätzlich `--vat-rates` mit einem Satz je Position. Zahlung später separat zuordnen.
+- `buchhaltung rechnung manual-prepare --interactive`: manueller Verkaufsentwurf ohne eBay/DHL/Vine; eindeutige eigene Referenz verwenden. Bei einer anonymen Abholung kann im Dialog ausdrücklich auf Käufername und -anschrift verzichtet werden; es werden keine Platzhalterdaten erfunden. Bei Regelbesteuerung zusätzlich `--vat-rates` mit einem Satz je Position. Zahlung später separat zuordnen.
 - `buchhaltung rechnung configure --interactive --last-number 0000`: Profil für einen neuen leeren Rechnungsbestand; bestehenden Nummernstand niemals durch 0000 ersetzen.
 - Zahlungen und Korrekturen: beim Beleg den passenden Dashboard-Befehl kopieren. Er startet einen Dialog statt eine selbst erstellte JSON-Datei zu verlangen. Die Zahlung wird erst nach Anzeige aller konkreten Angaben und Eingabe von `BUCHEN` freigegeben. Minderungs- und Berichtigungsentwürfe bleiben vom Abschluss getrennt.
 - `buchhaltung archiv evidence --file PFAD --interactive`: Zusatznachweis ohne erfundene Ausgabenbuchung sichern.

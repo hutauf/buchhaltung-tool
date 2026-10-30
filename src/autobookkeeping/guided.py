@@ -126,8 +126,13 @@ def adjustment(catalog, rid, kind):
 
 def manual_invoice():
     p={'reference':ask('Eindeutige eigene Auftragsreferenz (für Dublettenprüfung)'),'verification_basis':ask('Quelle und Prüfung des Verkaufs')}
-    p['buyer']={k:ask(label) for k,label in [('name','Käufername'),('street','Straße / Hausnummer'),('postal_code','PLZ'),('city','Ort')]}
-    p['buyer'].update(country='Deutschland',country_iso='DE')
+    if yes('Anonymer Abholverkauf ohne Käufername und Käuferanschrift?',False):
+        p['anonymous_pickup']=True
+        p['buyer']={'name':'Privatkunde (Abholung)','street':'','postal_code':'','city':'',
+                    'country':'Deutschland','country_iso':'DE'}
+    else:
+        p['buyer']={k:ask(label) for k,label in [('name','Käufername'),('street','Straße / Hausnummer'),('postal_code','PLZ'),('city','Ort')]}
+        p['buyer'].update(country='Deutschland',country_iso='DE')
     p['delivery_date']=day('Liefer-/Leistungsdatum')
     p['positions']=[]
     while True:

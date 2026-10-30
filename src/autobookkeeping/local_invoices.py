@@ -159,8 +159,13 @@ def render_pdf(invoice: dict, draft: bool) -> bytes:
         story.append(p(f"{document_label} {invoice.get('document_number') or invoice['number']}", heading))
     if invoice.get("original_number"):
         story.append(p(f"Bezug: Rechnung {invoice['original_number']} vom {invoice['original_date']}", bold))
-    story.extend([Spacer(1, 10*mm), p(buyer["name"], bold), p(buyer["street"]),
-                  p(f"{buyer['postal_code']} {buyer['city']}"), p(buyer["country"]), Spacer(1, 9*mm)])
+    story.append(Spacer(1, 10*mm))
+    if invoice.get("anonymous_pickup"):
+        story.extend([p("Privatkunde (Abholung)", bold),
+                      p("Keine Käuferanschrift angegeben", small), Spacer(1, 9*mm)])
+    else:
+        story.extend([p(buyer["name"], bold), p(buyer["street"]),
+                      p(f"{buyer['postal_code']} {buyer['city']}"), p(buyer["country"]), Spacer(1, 9*mm)])
     facts = [[p("Belegnummer", small), p("noch nicht vergeben" if draft else invoice.get("document_number") or invoice["number"], bold)],
              [p("Entwurfsdatum" if draft else "Rechnungsdatum", small), p(datetime.fromisoformat(invoice["date"]).strftime("%d.%m.%Y"))],
              [p("Lieferdatum", small), p(datetime.fromisoformat(invoice["delivery_date"]).strftime("%d.%m.%Y") if invoice.get("delivery_date") else "noch zu prüfen")],
@@ -308,7 +313,13 @@ class LocalInvoices:
     def prepare_manual(self, payload: dict, rates=None, replacement_of=None) -> dict:
         from datetime import date as calendar_day
         buyer = payload.get('buyer', {})
-        if buyer.get('country_iso') != 'DE' or not all(isinstance(buyer.get(k),str) and buyer[k].strip() for k in ('name','street','postal_code','city')):
+        anonymous_pickup = payload.get('anonymous_pickup') is True
+        if anonymous_pickup:
+            if buyer.get('country_iso') != 'DE' or buyer.get('name') != 'Privatkunde (Abholung)':
+                raise WorkflowError('Anonymer Abholverkauf muss als Privatkunde (Abholung) gekennzeichnet sein')
+            buyer = {'name': 'Privatkunde (Abholung)', 'street': '', 'postal_code': '',
+                     'city': '', 'country': 'Deutschland', 'country_iso': 'DE'}
+        elif buyer.get('country_iso') != 'DE' or not all(isinstance(buyer.get(k),str) and buyer[k].strip() for k in ('name','street','postal_code','city')):
             raise WorkflowError('Manuelle Rechnung benötigt eine vollständige inländische Anschrift')
         reference = payload.get('reference'); basis = payload.get('verification_basis')
         if not isinstance(reference,str) or not reference.strip() or not isinstance(basis,str) or not basis.strip():
@@ -324,7 +335,8 @@ class LocalInvoices:
             positions.append(dict(title=row['title'].strip(),quantity=quantity,unit='Stk.',unit_gross=price,gross=amount(Decimal(price)*quantity),vat_rate=0))
         if not positions: raise WorkflowError('Mindestens eine Rechnungsposition erforderlich')
         snapshot=dict(order_id='manual:'+sha(reference.strip().encode()),sales_record_number=None,order_id_aliases=[],order_status='manual',
-                      paid_at=None,delivery_date=delivery,tracking_number=None,buyer=dict(buyer),positions=positions,currency='EUR',
+                      paid_at=None,delivery_date=delivery,tracking_number=None,buyer=dict(buyer),anonymous_pickup=anonymous_pickup,
+                      positions=positions,currency='EUR',
                       gross=amount(sum((Decimal(p['gross']) for p in positions),Decimal(0))),entry_source='manual',manual_reference=reference.strip())
         return self._prepare(snapshot,{'entry_source':'manual','verification_basis':basis.strip(),'vine_status':'not_applicable','dhl_status':'not_applicable'},None,rates,replacement_of)
 
@@ -427,7 +439,7 @@ class LocalInvoices:
         manual = current.get('entry_source') == 'manual'
         if manual:
             if order is not None: raise WorkflowError('Manuellen Entwurf ohne eBay-Quelle abschließen')
-            source = {k:copy.deepcopy(current[k]) for k in ('order_id','sales_record_number','order_id_aliases','order_status','paid_at','delivery_date','tracking_number','buyer','positions','currency','gross','entry_source','manual_reference')}
+            source = {k:copy.deepcopy(current[k]) for k in ('order_id','sales_record_number','order_id_aliases','order_status','paid_at','delivery_date','tracking_number','buyer','anonymous_pickup','positions','currency','gross','entry_source','manual_reference')}
         else:
             if order is None: raise WorkflowError('Aktuelle eBay-Quelle fehlt')
             source = order_snapshot(order)
