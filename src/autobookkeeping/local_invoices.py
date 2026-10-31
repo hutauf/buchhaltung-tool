@@ -569,7 +569,8 @@ class LocalInvoices:
         if receipt.get("pay_date"):
             row["pay_date"] = receipt["pay_date"]
         after["records"][rid] = {"current": row, "history": []}
-        state.update(status="ok", expense_id=rid)
+        # A receipt booking cannot certify that external Vine writes completed.
+        state.update(status="ausgabe_angelegt", expense_id=rid)
         draft["receipt_candidate"] = dict(receipt, booked=True, expense_id=rid)
         self.commit(before, after, {})
         return {"ok": True, "expense_id": rid, "gross": row["gross"], "invoice_number": invoice["number"]}

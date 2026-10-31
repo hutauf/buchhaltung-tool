@@ -1,5 +1,7 @@
 # Buchhaltungswerkzeug
 
+- Produktiver Betrieb: Das lokale System mit eigenständigem privatem `daten/` ist führend. Invoiz und Norman sind deaktiviert; keine Dienstadapter rekonstruieren. Aktuelle operative Regeln ausschließlich in `daten/AGENTS.md` und `daten/buchhaltung/AGENTS.md` lesen. Ein Freigabebündel umfasst Rechnung, passende DHL-Ausgabe und alle ausgewählten Vine-Positionen; Gesamtabschluss anhand der tatsächlichen Datensätze prüfen, nicht allein anhand eines Statusfelds.
+
 - Mit dem Nutzer auf Deutsch arbeiten. Toolcode und Datenrepo sind unabhängig.
 - Eigene neue Rechnungen und die geplante EÜR-Auswertung ausschließlich für Kleinunternehmer nach § 19 UStG. Einfache Einnahmen-/Ausgabenaufzeichnung ohne Kontenrahmen im Nutzerablauf. Amazon-/Vine-Produkttester-Leistungsumsätze einschließlich Reverse-Charge-Umsätzen bleiben vorerst außerhalb des Umfangs; keine automatische Übernahme. Original-Steuerangaben vorhandener und eingehender Belege erhalten.
 - Keine Clients, Zugangskonfiguration, Importadapter oder Schreibskripte für frühere Rechnungsdienste in dieses Toolrepo aufnehmen. Historische importierte Belege dienstunabhängig im Speicher lesen; deren verschlüsselte Quellkennungen und Originale nicht umschreiben. `buchhaltung` startet ausschließlich die lokalen Helfer.

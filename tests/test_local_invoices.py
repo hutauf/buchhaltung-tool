@@ -261,7 +261,7 @@ def test_receipt_candidate_not_booked_until_invoice_and_approval(workspace):
         workflow.expense(issued["id"],"wrong-receipt",True)
     expense = workflow.expense(issued["id"],changed["receipt_candidate_sha256"],True)
     assert expense["gross"] == "5.10" and expense["invoice_number"] == "0901"
-    assert archive.catalog()["local_workflow"][issued["id"]]["status"] == "ok"
+    assert archive.catalog()["local_workflow"][issued["id"]]["status"] == "ausgabe_angelegt"
     with pytest.raises(WorkflowError):
         workflow.expense(issued["id"],changed["receipt_candidate_sha256"],True)
 

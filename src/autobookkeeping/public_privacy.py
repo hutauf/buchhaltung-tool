@@ -48,7 +48,8 @@ def private_fingerprints(repo):
             if not text:return
             if field in identifiers and len(text)>=6:values.add(text.casefold())
             if field in ('sha256','sha256_plaintext','sha256_ciphertext') and len(text)>=32:values.add(text.casefold())
-            if field in personal and len(text)>=4 and text.casefold() not in ('berlin','deutschland') and any(any(part in name for part in ('buyer','customer','issuer','shipping_address')) for name in path[:-1]):
+            # Fixed anonymous-pickup labels contain no personal identity.
+            if field in personal and len(text)>=4 and text.casefold() not in ('berlin','deutschland','privatkunde (abholung)') and any(any(part in name for part in ('buyer','customer','issuer','shipping_address')) for name in path[:-1]):
                 values.add(text.casefold())
     walk(archive.catalog())
     checklist=data/'bookkeeping_checklist.json.enc'

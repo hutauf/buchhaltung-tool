@@ -1,6 +1,8 @@
 # Verfahrensdokumentation der lokalen Belegablage
 
-Version 13 · Technikstand 27.10.2026, rechtliche Grundlagen zuletzt geprüft am 21.10.2026. Sicherheitsbeschreibung mit Implementierung und OpenTimestamps-Primärdokumentation am 19.10.2026 abgeglichen. Änderungen dieser Beschreibung werden mit der Toolhistorie versioniert. Die im privaten Workspace verwendete Toolrevision steht in `tool-version.json`.
+Version 14 · Technikstand 31.10.2026, rechtliche Grundlagen zuletzt geprüft am 21.10.2026. Sicherheitsbeschreibung mit Implementierung und OpenTimestamps-Primärdokumentation am 19.10.2026 abgeglichen. Änderungen dieser Beschreibung werden mit der Toolhistorie versioniert. Die im privaten Workspace verwendete Toolrevision steht in `tool-version.json`.
+
+Der produktive Betrieb verwendet ausschließlich das lokale Tool und das eigenständige private Datenrepository. Frühere Rechnungsdienste sind deaktiviert; importierte Herkunftskennungen bleiben erhalten. Eine konkrete Abschlussfreigabe umfasst Rechnung, passende verifizierte Versandkosten und die ausgewählten Vine-Verkaufsdatensätze. Fehlende Komponenten werden ausdrücklich als offen gemeldet. Eine gebuchte DHL-Ausgabe erhält intern `ausgabe_angelegt`; sie bescheinigt keinen externen Vine-Abschluss. Der Vine-Schreibhelfer prüft vor Schreibbeginn die private Veröffentlichung, liest jede Änderung zurück und veröffentlicht die verschlüsselte lokale Verknüpfung über den regulären Git-/OTS-Ablauf. Ausstehende Bitcoin-Bestätigung wird getrennt vom erfolgreichen Datenpush ausgewiesen. Tägliche Verkaufsüberwachung bleibt lesend hinsichtlich finanzieller Buchungen und speichert lediglich technische Kontrollnachweise.
 
 ## 1. Allgemeine Beschreibung
 

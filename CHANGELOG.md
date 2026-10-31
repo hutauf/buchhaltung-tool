@@ -2,6 +2,12 @@
 
 ## Unveröffentlicht
 
+- Produktive Betriebsregeln bereinigt: deaktivierte Altdienste, vollständiges
+  Rechnungs-/DHL-/Vine-Abschlussbündel und rein technische tägliche Überwachung.
+  Vine-Schreibvorgänge veröffentlichen verifizierte Verknüpfungen über die private
+  Git-/OTS-Pipeline. DHL-Buchung allein meldet keinen Gesamtabschluss.
+  Generische anonyme Abholkundenbezeichnung löst keinen Personenalarm aus.
+
 - Fehlerhafte erfasste Ausgaben mit Freigabe und Grund ungültig erklären: Originale,
   Quelldaten, Zahlungsinformationen und Historien bleiben erhalten. Eigener
   verschlüsselter Vermerk bleibt bei Quellaktualisierungen bestehen; keine EÜR-

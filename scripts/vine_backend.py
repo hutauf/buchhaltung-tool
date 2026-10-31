@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from zoneinfo import ZoneInfo
 
 from _agent_common import fail, print_json
@@ -8,6 +9,9 @@ from autobookkeeping.checklist import ChecklistStore
 from autobookkeeping.config import load_settings
 from autobookkeeping.ebay_client import EbayTradingClient
 from autobookkeeping.models import EbayOrder
+from autobookkeeping.workspace import data_root
+from autobookkeeping.publication import Publication
+from filelock import FileLock
 from autobookkeeping.vine_backend import (
     VineBackendClient,
     candidate_matches,
@@ -19,7 +23,7 @@ from autobookkeeping.vine_backend import (
 )
 
 
-def main() -> int:
+def run() -> int:
     parser = argparse.ArgumentParser(description="Vine/Teilwert backend helper")
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -205,6 +209,20 @@ def main() -> int:
 
     fail(f"Unknown command: {args.command}")
     return 1
+
+
+def main() -> int:
+    writes = len(sys.argv) > 1 and sys.argv[1] == 'update-sale' and '--approved' in sys.argv
+    root = data_root()
+    with Publication(root, 'verified Vine sale', enabled=writes) as publication:
+        if writes:
+            with FileLock(root / 'output/archive.lock', timeout=0):
+                result = run()
+        else:
+            result = run()
+    if writes:
+        print_json({'publication': publication.result})
+    return result
 
 
 def _selected_order_item(order: EbayOrder, item_index: int | None):
