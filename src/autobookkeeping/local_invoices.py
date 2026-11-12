@@ -306,8 +306,14 @@ class LocalInvoices:
     def prepare(self, order: EbayOrder, checks: dict, attachment: tuple[dict, bytes] | None = None,
                 rates: list[int] | None = None, replacement_of: str | None = None) -> dict:
         vine_ok = checks.get('vine_checked') or checks.get('vine_status') == 'not_configured'
-        if not vine_ok or not checks.get('dhl_checked'):
+        dhl_read_ok = bool(checks.get('dhl_checked'))
+        dhl_unavailable_for_draft = attachment is None and checks.get('dhl_status') in {
+            'mailbox_unavailable', 'search_timeout'
+        }
+        if not vine_ok or not (dhl_read_ok or dhl_unavailable_for_draft):
             raise WorkflowError('DHL-Leseprüfung und konfigurierte Vine-Prüfung vor dem Entwurf erforderlich')
+        if attachment is not None and not dhl_read_ok:
+            raise WorkflowError('Ein DHL-Beleg darf nur nach erfolgreicher DHL-Leseprüfung angehängt werden')
         return self._prepare(order_snapshot(order), checks, attachment, rates, replacement_of)
 
     def prepare_manual(self, payload: dict, rates=None, replacement_of=None) -> dict:

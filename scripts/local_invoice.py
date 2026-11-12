@@ -36,17 +36,37 @@ def read_checks(order, settings) -> dict:
     checks["vine_checked"] = bool(settings.vine_backend_url)
     # Use the existing IMAP helper; suppress signed receipt links in saved metadata/stdout.
     if order.tracking_number:
-        run = subprocess.run([sys.executable, "-X", "utf8", str(TOOL / "scripts/find_dhl_receipt.py"), order.tracking_number],
-                             cwd=data_root(), capture_output=True, timeout=90, check=True)
-        result = json.loads(run.stdout)
-        if not result.get("ok"):
-            raise WorkflowError("DHL-Mailprüfung nicht erfolgreich")
-        fields = ("uid", "date", "sender", "subject", "tracking_numbers", "prices_in_mail")
-        checks["dhl"] = {"count": result["count"],
-                         "mails": [{k: mail[k] for k in fields if k in mail} for mail in result["mails"]]}
+        try:
+            run = subprocess.run([sys.executable, "-X", "utf8", str(TOOL / "scripts/find_dhl_receipt.py"), order.tracking_number],
+                                 cwd=data_root(), capture_output=True, timeout=90, check=True)
+        except subprocess.TimeoutExpired:
+            checks["dhl"] = {"count": 0, "status": "search_timeout"}
+            checks["dhl_status"] = "search_timeout"
+            checks["dhl_checked"] = False
+        except subprocess.CalledProcessError as exc:
+            try:
+                failure = json.loads(exc.stdout or b"{}")
+            except (json.JSONDecodeError, TypeError):
+                failure = {}
+            if failure.get("error") == "Der Postfachzugriff ist fehlgeschlagen.":
+                checks["dhl"] = {"count": 0, "status": "mailbox_unavailable", "error_type": "imap_error"}
+                checks["dhl_status"] = "mailbox_unavailable"
+                checks["dhl_checked"] = False
+            else:
+                raise WorkflowError("DHL-Mailprüfung nicht erfolgreich") from None
+        else:
+            result = json.loads(run.stdout)
+            if not result.get("ok"):
+                raise WorkflowError("DHL-Mailprüfung nicht erfolgreich")
+            fields = ("uid", "date", "sender", "subject", "tracking_numbers", "prices_in_mail")
+            checks["dhl"] = {"count": result["count"], "status": "checked",
+                             "mails": [{k: mail[k] for k in fields if k in mail} for mail in result["mails"]]}
+            checks["dhl_status"] = "checked"
+            checks["dhl_checked"] = True
     else:
         checks["dhl"] = {"count": 0, "note": "Kein Tracking; gezielte Mail-Suche erforderlich"}
-    checks["dhl_checked"] = True
+        checks["dhl_status"] = "missing_tracking"
+        checks["dhl_checked"] = False
     return checks
 
 
