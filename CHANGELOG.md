@@ -2,6 +2,12 @@
 
 ## Unveröffentlicht
 
+- Internationaler eBay-Versand: Verkäufererlös und Versandkosten aus der
+  Inlandsstufe lesen und bei bezahlten Verkäufen mit der Verkäuferzahlung
+  abgleichen. Weiterleitungsentgelt und von eBay eingezogene Steuern gehören
+  nicht auf die Verkäuferrechnung. Fehlende/widersprüchliche Zuordnung sperrt
+  die Verarbeitung. Unveränderte API-Originale bleiben Kontrollnachweis.
+
 - DHL-Belege werden ausschließlich per HTTPS von `dhl.de`/`dhl.com` und deren
   Unteradressen geladen; fremde Links, Weiterleitungen und Formularziele werden
   abgelehnt. Lokaler Belegimport nutzt das Transaktionsjournal und bleibt nach

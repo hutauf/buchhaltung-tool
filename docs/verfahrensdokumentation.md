@@ -1,10 +1,22 @@
 # Verfahrensdokumentation der lokalen Belegablage
 
-Version 14 · Technikstand 31.10.2026, rechtliche Grundlagen zuletzt geprüft am 21.10.2026. Sicherheitsbeschreibung mit Implementierung und OpenTimestamps-Primärdokumentation am 19.10.2026 abgeglichen. Änderungen dieser Beschreibung werden mit der Toolhistorie versioniert. Die im privaten Workspace verwendete Toolrevision steht in `tool-version.json`.
+Version 15 · Technikstand 15.11.2026, rechtliche Grundlagen zuletzt geprüft am 21.10.2026. Sicherheitsbeschreibung mit Implementierung und OpenTimestamps-Primärdokumentation am 19.10.2026 abgeglichen. Änderungen dieser Beschreibung werden mit der Toolhistorie versioniert. Die im privaten Workspace verwendete Toolrevision steht in `tool-version.json`.
 
-Der produktive Betrieb verwendet ausschließlich das lokale Tool und das eigenständige private Datenrepository. Frühere Rechnungsdienste sind deaktiviert; importierte Herkunftskennungen bleiben erhalten. Eine konkrete Abschlussfreigabe umfasst Rechnung, passende verifizierte Versandkosten und die ausgewählten Vine-Verkaufsdatensätze. Fehlende Komponenten werden ausdrücklich als offen gemeldet. Eine gebuchte DHL-Ausgabe erhält intern `ausgabe_angelegt`; sie bescheinigt keinen externen Vine-Abschluss. Der Vine-Schreibhelfer prüft vor Schreibbeginn die private Veröffentlichung, liest jede Änderung zurück und veröffentlicht die verschlüsselte lokale Verknüpfung über den regulären Git-/OTS-Ablauf. Ausstehende Bitcoin-Bestätigung wird getrennt vom erfolgreichen Datenpush ausgewiesen. Tägliche Verkaufsüberwachung bleibt lesend hinsichtlich finanzieller Buchungen und speichert lediglich technische Kontrollnachweise.
+Der produktive Betrieb verwendet ausschließlich das lokale Tool und das eigenständige private Datenrepository. Frühere Rechnungsdienste sind deaktiviert; importierte Herkunftskennungen bleiben erhalten. Eine konkrete Abschlussfreigabe umfasst Rechnung, passende verifizierte Versandkosten und die ausgewählten Vine-Verkaufsdatensätze. Fehlende Komponenten werden ausdrücklich als offen gemeldet. Eine gebuchte DHL-Ausgabe erhält intern `ausgabe_angelegt`; sie bescheinigt keinen externen Vine-Abschluss. Der Vine-Schreibhelfer prüft vor Schreibbeginn die private Veröffentlichung, liest jede Änderung zurück und veröffentlicht die verschlüsselte lokale Verknüpfung über den regulären Git-/OTS-Ablauf. Ausstehende Bitcoin-Bestätigung wird getrennt vom erfolgreichen Datenpush ausgewiesen. Die tägliche Verkaufsüberwachung speichert technische Kontrollnachweise und darf bei entsprechender Beauftragung unverbindliche Rechnungsentwürfe und geprüfte DHL-Belegkandidaten vorbereiten. Finanzielle Festschreibung und Vine-Schreibvorgänge benötigen die konkrete Freigabe. Technische Fehler werden im Rahmen der beauftragten Pflege mit Prüfung, Tests und regulärer Codeveröffentlichung behoben; anschließend wird die Vorbereitung fortgesetzt.
 
 ## 1. Allgemeine Beschreibung
+
+Bei internationaler eBay-Weiterleitung wird der Verkäufererlös aus Artikelpreis
+und Versandkosten bis zur Sammelstelle ermittelt
+(`MultiLegShippingDetails.SellerShipmentToLogisticsProvider`). Bei bezahlten
+Verkäufen muss die erfolgreiche Verkäufer-Zahlungszuordnung unter `MonetaryDetails`
+diese Summe bestätigen. Käufergesamtbetrag, internationale Weiterleitung und von
+eBay eingezogene Steuer bleiben in den verschlüsselten API-Originalen erhalten,
+werden aber nicht als Verkäufererlös oder Verkäufer-Versandposition übernommen.
+Fehlende oder widersprüchliche Beträge/Währungen sperren die Verarbeitung.
+Die API-Lieferadresse bleibt unverändert; direkte Auslands-/Sondersteuerfälle
+werden durch diese Korrektur nicht freigeschaltet.
+[eBay GetOrders: Versandstufen und Zahlungszuordnung](https://developer.ebay.com/devzone/xml/docs/reference/ebay/getorders.html).
 
 Dieses Werkzeug verbindet lokale Verkaufsrechnungen, Korrekturbelege und zugehörige Ausgaben zu einer nachvollziehbaren Belegablage. Originale bleiben verschlüsselt erhalten, Zahlungen und Korrekturen bleiben zugeordnet, und jede reguläre Datenveröffentlichung durchläuft Integritätsprüfung, Git-Versionierung und die Einreichung eines unabhängigen Bitcoin-Zeitnachweises. Diese aufeinander aufbauenden Kontrollen schaffen eine überprüfbare Grundlage für die betreuten EÜR-Einträge.
 

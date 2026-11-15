@@ -9,6 +9,53 @@ from autobookkeeping.models import EbayOrder
 
 
 class EbayClientTests(unittest.TestCase):
+    def international_order(self):
+        return ET.fromstring('''<Order xmlns="urn:ebay:apis:eBLBaseComponents">
+          <OrderID>synthetic-international</OrderID>
+          <PaidTime>2025-01-02T12:00:00Z</PaidTime>
+          <Subtotal currencyID="EUR">20.00</Subtotal>
+          <Total currencyID="EUR">32.80</Total>
+          <ShippingServiceSelected><ShippingService>DE_eBayIntermediatedInternationalPriorityShippingIntraEU</ShippingService>
+            <ShippingServiceCost currencyID="EUR">11.50</ShippingServiceCost></ShippingServiceSelected>
+          <MultiLegShippingDetails><SellerShipmentToLogisticsProvider><ShippingServiceDetails>
+            <ShippingService>DE_DHLPaket</ShippingService><TotalShippingCost currencyID="EUR">4.50</TotalShippingCost>
+          </ShippingServiceDetails></SellerShipmentToLogisticsProvider></MultiLegShippingDetails>
+          <MonetaryDetails><Payments>
+            <Payment><PaymentStatus>Succeeded</PaymentStatus><Payee>eBay</Payee><PaymentAmount currencyID="EUR">8.30</PaymentAmount></Payment>
+            <Payment><PaymentStatus>Succeeded</PaymentStatus><Payee>synthetic-seller</Payee><PaymentAmount currencyID="EUR">24.50</PaymentAmount></Payment>
+          </Payments></MonetaryDetails>
+        </Order>''')
+
+    def test_international_seller_amount_excludes_ebay_shipping_and_tax(self):
+        order = _parse_order(self.international_order())
+        self.assertEqual((24.5, 4.5, 'DE_DHLPaket'),
+                         (order.total_value, order.shipping_cost, order.shipping_service))
+
+    def test_international_amounts_fail_closed_on_missing_or_conflicting_evidence(self):
+        ns = {'e': 'urn:ebay:apis:eBLBaseComponents'}
+        for path, text, currency in [
+            ('e:Subtotal', 'not-money', None), ('e:Subtotal', 'NaN', None),
+            ('e:Subtotal', '20.001', None), ('e:Subtotal', '20.00', 'USD'),
+            ('e:MonetaryDetails/e:Payments/e:Payment[2]/e:PaymentAmount', '21.50', None),
+            ('e:MonetaryDetails/e:Payments/e:Payment[2]/e:PaymentStatus', 'Pending', None),
+            ('e:MonetaryDetails/e:Payments/e:Payment[2]/e:Payee', '', None),
+        ]:
+            with self.subTest(path=path, text=text, currency=currency):
+                node = self.international_order(); field = node.find(path, ns); field.text = text
+                if currency: field.set('currencyID', currency)
+                with self.assertRaises(ValueError): _parse_order(node)
+        for path in ['e:Subtotal', 'e:MultiLegShippingDetails', 'e:MonetaryDetails']:
+            node = self.international_order(); node.remove(node.find(path, ns))
+            with self.subTest(missing=path), self.assertRaises(ValueError): _parse_order(node)
+
+    def test_unpaid_international_order_remains_unpaid_without_payment_allocation(self):
+        ns = {'e': 'urn:ebay:apis:eBLBaseComponents'}
+        node = self.international_order()
+        for path in ['e:PaidTime', 'e:MonetaryDetails']: node.remove(node.find(path, ns))
+        order = _parse_order(node)
+        self.assertIsNone(order.paid_at)
+        self.assertEqual(24.5, order.total_value)
+
     def test_parses_sales_record_number_and_order_status(self):
         node = ET.fromstring(
             """

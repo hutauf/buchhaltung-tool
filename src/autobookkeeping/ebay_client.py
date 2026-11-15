@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal, InvalidOperation
 from typing import Any
 from xml.etree import ElementTree as ET
 from xml.sax.saxutils import escape as xml_escape
@@ -141,6 +142,14 @@ class EbayTradingClient:
 def _parse_order(node: ET.Element) -> EbayOrder:
     total = node.find("e:Total", NS)
     shipping_cost = node.find("e:ShippingServiceSelected/e:ShippingServiceCost", NS)
+    total_value = _to_float(total.text if total is not None else None)
+    shipping_value = _to_float(shipping_cost.text if shipping_cost is not None else None)
+    service = _text(node, "e:ShippingServiceSelected/e:ShippingService")
+    leg = node.find("e:MultiLegShippingDetails/e:SellerShipmentToLogisticsProvider", NS)
+    if leg is not None:
+        total_value, shipping_value, service = _seller_leg_amounts(node, leg, total)
+    elif service and ("IntermediatedInternational" in service or "GlobalShipping" in service):
+        raise ValueError("Internationaler eBay-Versand ohne belegte Verkäufer-Versandstufe")
     tracking = node.find(".//e:ShipmentTrackingDetails", NS)
     return EbayOrder(
         order_id=_text(node, "e:OrderID") or "",
@@ -150,15 +159,56 @@ def _parse_order(node: ET.Element) -> EbayOrder:
         paid_at=_parse_dt(_text(node, "e:PaidTime")),
         shipped_at=_parse_dt(_text(node, "e:ShippedTime")),
         buyer_username=_text(node, "e:BuyerUserID"),
-        total_value=_to_float(total.text if total is not None else None),
+        total_value=total_value,
         currency=total.attrib.get("currencyID", "EUR") if total is not None else "EUR",
-        shipping_cost=_to_float(shipping_cost.text if shipping_cost is not None else None),
-        shipping_service=_text(node, "e:ShippingServiceSelected/e:ShippingService"),
+        shipping_cost=shipping_value,
+        shipping_service=service,
         tracking_number=_text(tracking, "e:ShipmentTrackingNumber"),
         tracking_carrier=_text(tracking, "e:ShippingCarrierUsed"),
         shipping_address=_parse_address(node.find("e:ShippingAddress", NS)),
         items=[_parse_item(tx) for tx in _findall(node, ".//e:Transaction")],
     )
+
+
+def _seller_leg_amounts(node: ET.Element, leg: ET.Element, total: ET.Element | None):
+    """Use seller proceeds before fees; exclude eBay's forwarding/tax payment.
+
+    Total and ShippingServiceSelected include the international leg. The seller
+    receives Subtotal plus the domestic leg. Successful seller allocations must
+    corroborate that sum on paid orders. Original responses remain unchanged.
+    """
+    currency = total.get("currencyID") if total is not None else None
+
+    def money(element):
+        if element is None or not currency or element.get("currencyID") != currency:
+            raise ValueError("Internationale eBay-Beträge fehlen oder haben abweichende Währungen")
+        try:
+            value = Decimal(element.text or "")
+            if not value.is_finite() or value < 0 or value != value.quantize(Decimal("0.01")):
+                raise InvalidOperation
+            return value
+        except InvalidOperation:
+            raise ValueError("Internationaler eBay-Betrag ist kein gültiger Centbetrag") from None
+
+    subtotal = money(node.find("e:Subtotal", NS))
+    domestic = money(leg.find("e:ShippingServiceDetails/e:TotalShippingCost", NS))
+    expected = subtotal + domestic
+    payments = node.findall("e:MonetaryDetails/e:Payments/e:Payment", NS)
+    seller_payments = [p for p in payments if _text(p, "e:PaymentStatus") == "Succeeded"
+                       and (_text(p, "e:Payee") or "").casefold() != "ebay"]
+    payees = {_text(p, "e:Payee") for p in seller_payments}
+    if seller_payments:
+        if len(payees) != 1 or not all(payees):
+            raise ValueError("Internationale eBay-Verkäuferzahlung ist nicht eindeutig zugeordnet")
+        allocated = sum((money(p.find("e:PaymentAmount", NS)) for p in seller_payments), Decimal(0))
+        if allocated != expected:
+            raise ValueError("eBay-Verkäuferzahlung stimmt nicht mit Artikelpreis plus Inlandsversand überein")
+    elif _text(node, "e:PaidTime"):
+        raise ValueError("Bezahlter internationaler eBay-Verkauf ohne bestätigte Verkäuferzahlung")
+    service = _text(leg, "e:ShippingServiceDetails/e:ShippingService")
+    if not service:
+        raise ValueError("Versandart der eBay-Verkäufer-Versandstufe fehlt")
+    return float(expected), float(domestic), service
 
 
 def _coalesce_orders(orders: list[EbayOrder]) -> list[EbayOrder]:
