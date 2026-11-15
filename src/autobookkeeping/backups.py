@@ -103,7 +103,7 @@ def public_status(catalog):
                      'readback_at':written[-1]['at'] if written else None,
                      'restore_result':tested[-1]['result'] if tested else 'untested',
                      'restore_at':tested[-1]['at'] if tested else None})
-    return {'rows':rows, 'interval_days':31}
+    return {'rows':rows, 'interval_days':365}
 
 
 def validate(catalog):

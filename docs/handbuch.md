@@ -26,7 +26,7 @@ Abrechnungen, Banknachweise oder zunächst ungeklärte Belege ohne Ausgabenbuchu
 .venv\Scripts\buchhaltung.exe archiv evidence --file 'ORIGINAL_AUSSERHALB' --metadata 'NACHWEIS_JSON_AUSSERHALB'
 ```
 
-Die Nachweismetadaten enthalten genau `date` (ISO-Datum), `description` und `verification_basis`. Dieser Archivvorgang führt die Commit-/Push-/OTS-Pipeline aus, erzeugt aber keinen EÜR-Eintrag und keinen Zahlungsfluss. Monatliche CD-Sicherung und Rückleseprüfung bleiben getrennte Arbeitsschritte.
+Die Nachweismetadaten enthalten genau `date` (ISO-Datum), `description` und `verification_basis`. Dieser Archivvorgang führt die Commit-/Push-/OTS-Pipeline aus, erzeugt aber keinen EÜR-Eintrag und keinen Zahlungsfluss. Jährliche Sicherung und Rückleseprüfung bleiben getrennte Arbeitsschritte.
 
 ## Verkaufsabgleich, Lieferanten-Erstattungen und Sicherungsregister
 
@@ -43,7 +43,7 @@ Lieferanten-Stornos und Minderungen über `buchhaltung beleg inspect PFAD` einle
 
 Der Export registriert nur einen vorbereiteten Snapshot. Das Medium erst nach tatsächlichem Schreiben und Abschließen bestätigen; die Bestätigung liest sämtliche Paketdateien vom angegebenen Medium und vergleicht den registrierten Manifesthash. Der Exportordner selbst ist dafür kein zulässiges Rückleseziel. Es gibt keine automatische Brennererkennung. `sicherung test` stellt beide Git-Bundles isoliert außerhalb der Repos wieder her, prüft Git-Objekte, Archiv/Originale und historische Gitnachweise und erhält das Ergebnis im verschlüsselten Register. Neuinstallation der Abhängigkeiten und erneute Bitcoin-Verifikation sind gesonderte Tests. Ein fertiger, noch nicht registrierter Export lässt sich mit `sicherung registrieren ORDNER` eintragen.
 
-Das Offline-Dashboard zeigt den letzten API-Abgleich, monatlichen Sicherungsbedarf, Registerstände und Bitcoin-Nachweisstatus. Es zeigt passende Befehle; API-/Medienaktionen führt es nicht aus. `veroeffentlichen confirm` erhält erfolgreiche Bitcoin-Prüfungen in einem an genaue Datei-Hashes gebundenen privaten Cache und aktualisiert das Dashboard. Öffentliche Verfahrensbeschreibung und private Betriebsangaben werden bei jeder Funktionsänderung mitgepflegt. Offene betriebliche Zuständigkeiten bleiben offen.
+Das Offline-Dashboard zeigt den letzten API-Abgleich, jährlichen Sicherungsbedarf, Registerstände und Bitcoin-Nachweisstatus. Es zeigt passende Befehle; API-/Medienaktionen führt es nicht aus. `veroeffentlichen confirm` erhält erfolgreiche Bitcoin-Prüfungen in einem an genaue Datei-Hashes gebundenen privaten Cache und aktualisiert das Dashboard. Öffentliche Verfahrensbeschreibung und private Betriebsangaben werden bei jeder Funktionsänderung mitgepflegt. Offene betriebliche Zuständigkeiten bleiben offen.
 
 ## Dashboard bedienen
 

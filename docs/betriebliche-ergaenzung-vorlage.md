@@ -14,7 +14,7 @@ Diese Vorlage im **privaten Datenrepo** führen. Persönliche Angaben und konkre
 | Zugriffsberechtigung, Geräte-/Datenträgerschutz, private Repo-Einstellungen | Offen |
 | Passwortsicherung, Wiederherstellungsvertretung und getrennte Lagerorte | Offen; niemals Passwort selbst eintragen |
 | Elfjährige Mindestaufbewahrung und mögliche Verlängerungen | Frist-/Verfahrensprüfung und zuständige Person offen |
-| Monatssicherung, Medieninventar, Brennen/Finalisierung/Rücklesen | `backup_register` verwenden; erst nach realem Schreiben/Abschließen vom tatsächlichen Medium bestätigen. Medium, Lagerort und tatsächliche Ergebnisse offen. |
+| Jahressicherung, Medieninventar, Brennen/Finalisierung/Rücklesen | `backup_register` verwenden; erst nach realem Schreiben/Abschließen vom tatsächlichen Medium bestätigen. Medium, Lagerort und tatsächliche Ergebnisse offen. |
 | Regelmäßiger Wiederherstellungstest einschließlich Abhängigkeiten | `sicherung test` im Register dokumentiert; unabhängige Neuinstallation und Bitcoin-Verifikation zusätzlich nötig. Testintervall und reale Ergebnisse offen. |
 | Prüferzugriff und Exportfreigabe | Zuständigkeit und Vorgehen offen |
 
