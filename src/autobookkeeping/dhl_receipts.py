@@ -1,16 +1,40 @@
 from __future__ import annotations
 
 from pathlib import Path
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit
 
 import httpx
 from bs4 import BeautifulSoup
+
+# Mail content is untrusted: anyone who knows a tracking number can send a mail
+# containing it. Receipts are fetched from DHL's own hosts only.
+DHL_HOSTS = ("dhl.de", "dhl.com")
+
+
+def is_dhl_url(url: str) -> bool:
+    try:
+        parsed = urlsplit(url)
+        host = (parsed.hostname or "").lower().rstrip(".")
+        port = parsed.port
+    except ValueError:
+        return False
+    if parsed.scheme != "https" or parsed.username or parsed.password or port not in (None, 443):
+        return False
+    return any(host == allowed or host.endswith("." + allowed) for allowed in DHL_HOSTS)
+
+
+def _require_dhl_host(request: httpx.Request) -> None:
+    # Runs for every request, including redirects, form targets and page links.
+    if not is_dhl_url(str(request.url)):
+        raise RuntimeError("DHL-Beleg wird nur von DHL-Adressen geladen; fremde Adresse abgelehnt")
 
 
 def likely_invoice_links(links: list[str]) -> list[str]:
     keywords = ("rechnung", "invoice", "beleg", "quittung", "download", "dhl")
     scored = []
     for link in links:
+        if not is_dhl_url(link):
+            continue
         lower = link.lower()
         score = sum(1 for keyword in keywords if keyword in lower)
         if score:
@@ -19,8 +43,11 @@ def likely_invoice_links(links: list[str]) -> list[str]:
 
 
 def download_receipt_from_link(url: str, output_dir: Path) -> Path:
+    if not is_dhl_url(url):
+        raise RuntimeError("DHL-Beleg wird nur von DHL-Adressen geladen; fremde Adresse abgelehnt")
     output_dir.mkdir(parents=True, exist_ok=True)
-    with httpx.Client(follow_redirects=True, timeout=60) as client:
+    with httpx.Client(follow_redirects=True, timeout=60,
+                      event_hooks={"request": [_require_dhl_host]}) as client:
         first = client.get(url)
         first.raise_for_status()
         if _is_pdf(first):

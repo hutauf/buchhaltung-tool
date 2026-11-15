@@ -2,6 +2,12 @@
 
 ## Unveröffentlicht
 
+- DHL-Belege werden ausschließlich per HTTPS von `dhl.de`/`dhl.com` und deren
+  Unteradressen geladen; fremde Links, Weiterleitungen und Formularziele werden
+  abgelehnt. Lokaler Belegimport nutzt das Transaktionsjournal und bleibt nach
+  einem Abbruch fortsetzbar. Git-Push erhält 15 Minuten statt 60 Sekunden.
+  eBay-Token-Übertragung im Anfragekopf dokumentiert; ungenutzter Code entfernt.
+
 - Produktive Betriebsregeln bereinigt: deaktivierte Altdienste, vollständiges
   Rechnungs-/DHL-/Vine-Abschlussbündel und rein technische tägliche Überwachung.
   Vine-Schreibvorgänge veröffentlichen verifizierte Verknüpfungen über die private

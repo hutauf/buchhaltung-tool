@@ -15,7 +15,10 @@ NS = {"e": "urn:ebay:apis:eBLBaseComponents"}
 
 
 class EbayTradingClient:
-    """Small read-only client for eBay Trading API Auth'n'Auth."""
+    """Small read-only client for the eBay Trading API.
+
+    The user token is sent in the X-EBAY-API-IAF-TOKEN header, never in the request body.
+    """
 
     PROD_TRADING_URL = "https://api.ebay.com/ws/api.dll"
     SANDBOX_TRADING_URL = "https://api.sandbox.ebay.com/ws/api.dll"
@@ -104,10 +107,6 @@ class EbayTradingClient:
         if ack not in {"Success", "Warning"}:
             raise RuntimeError(f"eBay Trading API {call_name} failed: {ack}: {_first_error(root)}")
         return root
-
-    def _requester_credentials_xml(self) -> str:
-        token = xml_escape(self.settings.ebay_authnauth_token)
-        return f"<RequesterCredentials><eBayAuthToken>{token}</eBayAuthToken></RequesterCredentials>"
 
     def _get_orders_xml(self, days: int, limit: int, page: int = 1, window=None) -> str:
         # NumberOfDays is limited to 30; explicit creation windows allow 90.

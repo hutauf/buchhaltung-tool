@@ -14,9 +14,13 @@ def git_environment():
     return {k:v for k,v in os.environ.items() if not k.startswith('GIT_') or k in ('GIT_SSH_COMMAND', 'GIT_TERMINAL_PROMPT')}
 
 
-def git(repo, *args, input=None):
+# Local Git commands finish quickly; a push uploads data over the user's connection.
+PUSH_TIMEOUT = 900
+
+
+def git(repo, *args, input=None, timeout=60):
     return subprocess.check_output(['git', '-C', str(repo), *args], input=input,
-                                   env=git_environment(), stderr=subprocess.PIPE, timeout=60)
+                                   env=git_environment(), stderr=subprocess.PIPE, timeout=timeout)
 
 
 def assert_git_root(repo):

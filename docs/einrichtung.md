@@ -56,7 +56,7 @@ GMX_PASSWORD='DEIN-GMX-ODER-APP-PASSWORT'
 ### eBay
 
 1. Im eBay Developers Program ein Entwicklerkonto und Production-Anwendungsschlüssel einrichten. App-ID, Dev-ID und Cert-ID aus diesem Schlüsselsatz übernehmen.
-2. Unter **User Tokens** einen **Production Auth’n’Auth-Token** für das eigene Verkäuferkonto erzeugen. Als `EBAY_AUTHNAUTH_TOKEN` hinterlegen; dieser Trading-API-Client verwendet keinen OAuth-App-Token. Abgelaufene oder widerrufene Tokens ersetzen. [eBay: Token-Anleitung](https://developer.ebay.com/devzone/xml/docs/howto/tokens/gettingtokens.html).
+2. Unter **User Tokens** einen **Production Auth’n’Auth-Token** für das eigene Verkäuferkonto erzeugen. Als `EBAY_AUTHNAUTH_TOKEN` hinterlegen; dieser Trading-API-Client verwendet keinen OAuth-App-Token. Der Token wird ausschließlich im Anfragekopf `X-EBAY-API-IAF-TOKEN` übertragen, nicht im XML-Inhalt. Abgelaufene oder widerrufene Tokens ersetzen. [eBay: Token-Anleitung](https://developer.ebay.com/devzone/xml/docs/howto/tokens/gettingtokens.html).
 3. Verbindung mit `.venv/Scripts/buchhaltung.exe ebay --days 30 --limit 10 --paid-only` prüfen.
 
 Deutschland (`EBAY_SITE_ID=77`) und Production (`EBAY_SANDBOX=false`) sind voreingestellt. Der Abruf erstellt keine Rechnung. `buchhaltung abgleich ebay --days 90 --save` speichert einen Kontrollabgleich verschlüsselt. Für tägliche Ausführung einen Scheduler einrichten; kein Gebührenimport oder Bankabgleich.
@@ -65,7 +65,7 @@ Deutschland (`EBAY_SITE_ID=77`) und Production (`EBAY_SANDBOX=false`) sind vorei
 
 1. In den GMX-Einstellungen den POP3-/IMAP-Zugriff einschalten. [GMX: Zugang und Serverdaten](https://hilfe.gmx.net/pop-imap/imap/imap-serverdaten.html).
 2. GMX-Adresse und Passwort eintragen. Bei Zwei-Faktor-Authentifizierung ein [GMX-App-Passwort](https://hilfe.gmx.net/sicherheit/2fa/anwendungsspezifisches-passwort.html) verwenden. Voreingestellt: `imap.gmx.net`, TLS-Port `993`. Bei Bedarf `GMX_IMAP_HOST`/`GMX_IMAP_PORT` ergänzen.
-3. DHL-Bestätigungsmails im Posteingang dieses Postfachs aufbewahren. Der Helfer durchsucht `INBOX` nach Sendungsnummer oder Text und lädt unterstützte Rechnungslinks herunter:
+3. DHL-Bestätigungsmails im Posteingang dieses Postfachs aufbewahren. Der Helfer durchsucht `INBOX` nach Sendungsnummer oder Text und lädt unterstützte Rechnungslinks herunter. Belege werden ausschließlich per HTTPS von `dhl.de`/`dhl.com` und deren Unteradressen geladen; Links und Weiterleitungen zu anderen Adressen werden abgelehnt:
 
 ```powershell
 .venv/Scripts/python.exe -X utf8 scripts/find_dhl_receipt.py 'SENDUNGSNUMMER' --download --output-dir C:/bk/belegpruefung/dhl

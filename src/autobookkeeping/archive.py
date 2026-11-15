@@ -191,7 +191,8 @@ class Archive:
         source_name = raw.get("source", "local")
         self.init()
         self.verify()
-        catalog = self.catalog()
+        import copy
+        before = self.catalog(); catalog = copy.deepcopy(before)
         rid = f"{source_name}:{raw['kind']}:{raw['source_id']}"
         order_ids = {v for v in [raw.get("order_id"), *raw.get("order_id_aliases", [])] if v}
         # SRN / aliases identify invoice context, never create a second invoice record.
@@ -234,11 +235,12 @@ class Archive:
         if prior:
             raise ValueError("Quell-ID vorhanden; Änderungen benötigen eine neue Korrektur-ID mit Bezug auf das Original")
         for name, data, digest in prepared:
-            self.write(name, data)
             catalog["documents"][name] = {"sha256_plaintext": digest, "bytes_plaintext": len(data), "record_id": rid}
         catalog["records"][rid] = {"current": row, "history": []}
-        self.save_catalog(catalog)
-        self.verify()
+        # Journalled like every other write: an interruption between the originals
+        # and the catalog is finished by recover instead of blocking the archive.
+        from autobookkeeping.local_invoices import LocalInvoices
+        LocalInvoices(self).commit(before, catalog, {name: data for name, data, _ in prepared})
         return {"ok": True, "changed": True, "record_id": rid}
 
     def verify(self) -> dict:

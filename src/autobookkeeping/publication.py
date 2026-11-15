@@ -13,12 +13,12 @@ from filelock import FileLock
 from autobookkeeping.archive import Archive, atomic, checkpoint, encoded, sha, verify_checkpoint
 from autobookkeeping.local_invoices import LocalInvoices, WorkflowError
 from autobookkeeping.timestamps import load_proof
-from autobookkeeping.workspace import assert_data_repo, assert_tool_clean, tool_root, git as workspace_git
+from autobookkeeping.workspace import PUSH_TIMEOUT, assert_data_repo, assert_tool_clean, tool_root, git as workspace_git
 
 
 def git(repo, *args, input=None):
     assert_data_repo(repo)
-    return workspace_git(repo, *args, input=input)
+    return workspace_git(repo, *args, input=input, timeout=PUSH_TIMEOUT if args[:1] == ("push",) else 60)
 
 
 def data_path(name):
