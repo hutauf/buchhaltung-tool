@@ -161,6 +161,18 @@ def test_partial_generator_edits_and_secret_staging_blocked(staged_repo):
     with pytest.raises(ValueError,match="Passwort"):SCRIPT["build"](repo,tool=repo,staged=True)
 
 
+def test_dashboard_crlf_conversion_is_not_a_foreign_content_edit(staged_repo):
+    repo, archive, git = staged_repo
+    target = repo / 'dashboard.html'
+    target.write_bytes(target.read_bytes().replace(b'\r\n', b'\n').replace(b'\n', b'\r\n'))
+    source = repo / 'docs/verfahrensdokumentation.md'
+    source.write_bytes(source.read_bytes() + b'\nSynthetic procedure update.\n')
+    git('add', 'docs/verfahrensdokumentation.md')
+    SCRIPT['build'](repo, tool=repo, staged=True)
+    assert b'Synthetic procedure update.' in target.read_bytes()
+    SCRIPT['build'](repo, tool=repo, staged=True, check=True)
+
+
 def test_projection_and_script_injection_have_no_personal_fields():
     source=row();source.update(number='</script><script>PRIVATE_NUMBER</script>',date="PRIVATE DATE")
     catalog={"records":{"opaque-1":{"current":source,"history":[]}},"documents":{}}

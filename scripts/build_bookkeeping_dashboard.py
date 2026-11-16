@@ -74,7 +74,10 @@ def build(repo: Path, staged=False, check=False, tool=None):
                 indexed = index_blob(repo, "dashboard.html")
             except subprocess.CalledProcessError:
                 indexed = None
-            if existing is not None and existing != indexed:
+            # A checkout may normalize CRLF even when Git reports no user edit.
+            # Preserve all content changes; only line-ending conversion is equivalent.
+            if existing is not None and (indexed is None or
+                    existing.replace(b'\r\n', b'\n') != indexed.replace(b'\r\n', b'\n')):
                 raise ValueError("Lokale Dashboard-Änderung würde überschrieben; zuerst bewusst sichern oder verwerfen")
         atomic(target, data)
     if staged and not check:

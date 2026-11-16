@@ -7,6 +7,8 @@
   Hashgebundene Übernahme nach einer gemeinsamen Freigabe; dieselbe Freigabe
   umfasst Rechnung, DHL-Ausgabe mit vorgelegten belegten Zahlungsdaten und
   ausgewählte Vine-Verkäufe. Dokumentation und Betriebsanweisungen präzisiert.
+  Unverbindliche Nummernvorschauen bleiben bei Stapelabschlüssen fortschreibbar.
+  Der Dashboard-Schutz unterscheidet Inhaltsänderungen von CRLF-Konvertierung.
 
 - Internationaler eBay-Versand: Verkäufererlös und Versandkosten aus der
   Inlandsstufe lesen und bei bezahlten Verkäufen mit der Verkäuferzahlung

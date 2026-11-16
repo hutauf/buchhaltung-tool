@@ -124,8 +124,8 @@ def adopt_preparation(workflow, path: Path, revision: str, order, approved: bool
         if any(invoice.get(k) != value for k, value in source.items()):
             raise WorkflowError('Verkaufsdaten seit lokaler Vorbereitung geändert')
     workflow.check_duplicates(before, invoice, invoice.get('replacement_of'))
-    if LocalInvoices.summary(invoice, before)['proposed_number'] != plan['proposed_number']:
-        raise WorkflowError('Nummernvorschau seit lokaler Vorbereitung geändert; Bündel neu prüfen')
+    # The preview reserves no number. A batch may advance the sequence before
+    # this invoice; issue still checks the actual next number under its lock.
     active = [v['current'] for v in before.get('local_invoice_drafts', {}).values()
               if v['current']['status'] == 'test_draft' and same_order(v['current'], invoice)]
     if active and (len(active) != 1 or active[0]['id'] != invoice['id']

@@ -70,6 +70,22 @@ def test_prepare_target_inside_repo_is_rejected(workspace):
         prepare_external(workflow, archive.repo / 'local', lambda staged: staged.prepare(order, checks))
 
 
+def test_external_batch_allows_unreserved_number_sequence_to_advance(workspace, tmp_path):
+    archive, workflow, order, checks = workspace
+    workflow.activate('0900', '0900', True)
+    result = prepare_external(workflow, tmp_path / 'local', lambda staged: staged.prepare(order, checks))
+    different = copy.deepcopy(order)
+    different.order_id = 'different-synthetic-sale'
+    different.sales_record_number = '9999'
+    different.items[0].transaction_id = 'different-synthetic-transaction'
+    draft = workflow.prepare(different, checks)
+    workflow.issue(draft['id'], draft['revision'], '0901', different, True)
+    adopted = adopt_preparation(workflow, tmp_path / 'local/vorbereitung.json',
+                                result['preparation_revision'], order, True)
+    assert adopted['proposed_number'] == '0902'
+    assert workflow.issue(adopted['id'], adopted['revision'], '0902', order, True)['number'] == '0902'
+
+
 def test_cli_local_only_disables_publication(workspace, tmp_path, monkeypatch):
     import runpy
     import sys
