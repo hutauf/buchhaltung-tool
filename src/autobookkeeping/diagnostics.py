@@ -9,6 +9,7 @@ def failure(exc, repo: Path | None = None) -> dict:
     from autobookkeeping.local_invoices import WorkflowError
     import imaplib
     import httpx
+    from autobookkeeping.imap_client import GmxAccessError
     from filelock import Timeout
     error, hint = "Vorgang konnte nicht abgeschlossen werden.", "Eingaben prüfen und den Vorgang erneut prüfen, bevor du ihn wiederholst."
     if isinstance(exc, WorkflowError):
@@ -29,6 +30,17 @@ def failure(exc, repo: Path | None = None) -> dict:
         hint = "Zugangsdaten und Berechtigungen der ausgewählten Anbindung prüfen." if status in (401,403) else "Verfügbarkeit der Anbindung prüfen; später erneut versuchen."
     elif isinstance(exc, httpx.RequestError):
         error, hint = "Die Verbindung zum angebundenen Dienst ist fehlgeschlagen.", "Internetverbindung und konfigurierte Anbindung prüfen; später erneut versuchen."
+    elif isinstance(exc, GmxAccessError):
+        error = 'Der Postfachzugriff ist fehlgeschlagen.'
+        hint = {
+            'configuration': 'GMX-Zugangsdaten in der privaten lokalen Konfiguration vervollständigen.',
+            'tls_verification': 'Serverzertifikat konnte nicht geprüft werden; Zertifikatsprüfung nicht abschalten.',
+            'connection': 'GMX-IMAP-Verbindung und Erreichbarkeit prüfen.',
+            'authentication': 'GMX lehnt die Anmeldung ab. IMAP-Freischaltung, Kontosperre und gültiges App-Passwort prüfen; keine weiteren identischen Loginversuche.',
+            'mailbox': 'Anmeldung erfolgreich, aber das Postfach konnte nicht lesend geöffnet werden.',
+            'search': 'IMAP-Suche fehlgeschlagen; das Ergebnis ist kein fehlender Beleg.',
+            'fetch': 'IMAP-Nachricht konnte nicht vollständig gelesen werden; kein erfolgreicher Belegabgleich.',
+        }[exc.stage]
     elif isinstance(exc, imaplib.IMAP4.error):
         error, hint = 'Der Postfachzugriff ist fehlgeschlagen.', 'GMX-IMAP-Zugang und gegebenenfalls das App-Passwort prüfen; die Mailprüfung anschließend erneut starten.'
     elif isinstance(exc, ValueError):
@@ -36,6 +48,7 @@ def failure(exc, repo: Path | None = None) -> dict:
     elif isinstance(exc, (EOFError, KeyboardInterrupt)):
         error, hint = "Eingabe abgebrochen.", "Interaktive Befehle in einem Terminal ausführen. Ohne Abschlussbestätigung wird nicht gebucht."
     result = {"ok": False, "error": error, "error_type": type(exc).__name__, "hint": hint}
+    if isinstance(exc, GmxAccessError): result['imap_stage'] = exc.stage
     if repo is not None and (repo / 'output/publication.json').is_file():
         result['publication_pending'] = True
         result['next'] = "buchhaltung veroeffentlichen status, danach buchhaltung veroeffentlichen resume; Buchung nicht erneut anlegen."

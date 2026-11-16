@@ -1,15 +1,13 @@
 from __future__ import annotations
 
 import argparse
-import email
-import imaplib
 import re
 from pathlib import Path
 
 from _agent_common import print_json, ROOT
 from autobookkeeping.config import load_settings
 from autobookkeeping.dhl_receipts import download_receipt_from_link, likely_invoice_links
-from autobookkeeping.imap_client import _message_text, _parse_message
+from autobookkeeping.imap_client import _message_text, _parse_message, gmx_imap, search_messages, read_message
 
 
 def main() -> int:
@@ -21,16 +19,10 @@ def main() -> int:
 
     settings = load_settings()
     mails = []
-    with imaplib.IMAP4_SSL(settings.gmx_imap_host, settings.gmx_imap_port) as imap:
-        imap.login(settings.gmx_email, settings.gmx_password)
-        imap.select("INBOX")
-        status, data = imap.search(None, "TEXT", f'"{args.tracking_number}"')
-        ids = data[0].split() if status == "OK" and data else []
+    with gmx_imap(settings) as imap:
+        ids = search_messages(imap, 'TEXT', f'"{args.tracking_number}"')
         for uid in ids:
-            status, msg_data = imap.fetch(uid, "(RFC822)")
-            if status != "OK" or not msg_data or not isinstance(msg_data[0], tuple):
-                continue
-            msg = email.message_from_bytes(msg_data[0][1])
+            msg = read_message(imap, uid)
             candidate = _parse_message(uid.decode(), msg)
             body = _message_text(msg)
             invoice_links = [

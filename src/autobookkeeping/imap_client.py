@@ -3,10 +3,14 @@ from __future__ import annotations
 import email
 import imaplib
 import re
+import ssl
+from contextlib import contextmanager
 from datetime import date, timedelta
 from email.message import Message
 from html import unescape
 from urllib.parse import unquote
+
+import certifi
 
 from autobookkeeping.config import Settings
 from autobookkeeping.models import DhlMailCandidate
@@ -14,6 +18,62 @@ from autobookkeeping.models import DhlMailCandidate
 
 LINK_RE = re.compile(r"https?://[^\s\"'<>)]+", re.IGNORECASE)
 TRACKING_RE = re.compile(r"\b(?:[A-Z]{2}\d{9}[A-Z]{2}|\d{12,22})\b")
+
+
+class GmxAccessError(imaplib.IMAP4.error):
+    """A safe failure stage; never retain a server response or credentials."""
+    def __init__(self, stage):
+        self.stage = stage
+        super().__init__('GMX IMAP access failed')
+
+
+@contextmanager
+def gmx_imap(settings):
+    if not settings.gmx_email or not settings.gmx_password:
+        raise GmxAccessError('configuration')
+    # IMAP4_SSL without an explicit context does not verify the server certificate.
+    # Keep hostname verification enabled and use the maintained Mozilla trust roots.
+    context = ssl.create_default_context(cafile=certifi.where())
+    try:
+        connection = imaplib.IMAP4_SSL(settings.gmx_imap_host, settings.gmx_imap_port,
+                                      ssl_context=context, timeout=30)
+    except ssl.SSLCertVerificationError:
+        raise GmxAccessError('tls_verification') from None
+    except (OSError, imaplib.IMAP4.error):
+        raise GmxAccessError('connection') from None
+    with connection as imap:
+        try:
+            imap.login(settings.gmx_email, settings.gmx_password)
+        except imaplib.IMAP4.error:
+            raise GmxAccessError('authentication') from None
+        try:
+            status, _ = imap.select('INBOX', readonly=True)
+        except imaplib.IMAP4.error:
+            raise GmxAccessError('mailbox') from None
+        if status != 'OK':
+            raise GmxAccessError('mailbox')
+        yield imap
+
+
+def search_messages(imap, *criteria):
+    try:
+        status, data = imap.search(None, *criteria)
+    except imaplib.IMAP4.error:
+        raise GmxAccessError('search') from None
+    if status != 'OK':
+        raise GmxAccessError('search')
+    return data[0].split() if data and data[0] else []
+
+
+def read_message(imap, message_id):
+    try:
+        status, data = imap.fetch(message_id, '(BODY.PEEK[])')
+    except imaplib.IMAP4.error:
+        raise GmxAccessError('fetch') from None
+    parts = [part[1] for part in (data or []) if isinstance(part, tuple) and isinstance(part[1], bytes)]
+    if status != 'OK' or len(parts) != 1:
+        raise GmxAccessError('fetch')
+    return email.message_from_bytes(parts[0])
 
 
 class GmxImapClient:
@@ -25,27 +85,13 @@ class GmxImapClient:
             raise RuntimeError("GMX_EMAIL oder GMX_PASSWORD fehlt")
 
         since = (date.today() - timedelta(days=days)).strftime("%d-%b-%Y")
-        with imaplib.IMAP4_SSL(self.settings.gmx_imap_host, self.settings.gmx_imap_port) as imap:
-            try:
-                imap.login(self.settings.gmx_email, self.settings.gmx_password)
-            except imaplib.IMAP4.error as exc:
-                raise RuntimeError(
-                    "GMX IMAP Login fehlgeschlagen. Bitte in GMX POP3/IMAP aktivieren "
-                    "und bei aktiver 2FA ein anwendungsspezifisches Passwort verwenden."
-                ) from exc
-            imap.select("INBOX")
+        with gmx_imap(self.settings) as imap:
 
             # GMX supports ordinary IMAP SEARCH. Keep it broad, then filter locally.
-            status, data = imap.search(None, "SINCE", since, "TEXT", '"DHL"')
-            if status != "OK":
-                raise RuntimeError(f"IMAP search failed: {status}")
-            uids = data[0].split()[-limit:]
+            uids = search_messages(imap, 'SINCE', since, 'TEXT', '"DHL"')[-limit:]
             candidates = []
             for uid in reversed(uids):
-                status, msg_data = imap.fetch(uid, "(RFC822)")
-                if status != "OK" or not msg_data or not isinstance(msg_data[0], tuple):
-                    continue
-                msg = email.message_from_bytes(msg_data[0][1])
+                msg = read_message(imap, uid)
                 candidate = _parse_message(uid.decode(), msg)
                 if "dhl" in (candidate.sender + " " + candidate.subject).lower() or candidate.links:
                     candidates.append(candidate)

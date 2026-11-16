@@ -67,6 +67,8 @@ Deutschland (`EBAY_SITE_ID=77`) und Production (`EBAY_SANDBOX=false`) sind vorei
 2. GMX-Adresse und Passwort eintragen. Bei Zwei-Faktor-Authentifizierung ein [GMX-App-Passwort](https://hilfe.gmx.net/sicherheit/2fa/anwendungsspezifisches-passwort.html) verwenden. Voreingestellt: `imap.gmx.net`, TLS-Port `993`. Bei Bedarf `GMX_IMAP_HOST`/`GMX_IMAP_PORT` ergänzen.
 3. DHL-Bestätigungsmails im Posteingang dieses Postfachs aufbewahren. Der Helfer durchsucht `INBOX` nach Sendungsnummer oder Text und lädt unterstützte Rechnungslinks herunter. Belege werden ausschließlich per HTTPS von `dhl.de`/`dhl.com` und deren Unteradressen geladen; Links und Weiterleitungen zu anderen Adressen werden abgelehnt:
 
+Mit `.venv/Scripts/python.exe -X utf8 scripts/check_imap.py` den IMAP-Zugang rein lesend prüfen. Der Helfer verifiziert Serverzertifikat und Hostnamen mit dem Mozilla-CA-Bestand, meldet keine Zugangsdaten und unterscheidet Verbindung, TLS-Prüfung, Anmeldung und Postfachzugriff. Nachrichten werden mit `BODY.PEEK[]` gelesen und dadurch nicht als gelesen markiert. Bei `imap_stage: authentication` nicht dieselben Zugangsdaten wiederholt probieren; IMAP-Freischaltung, Kontosperre und gültiges App-Passwort im GMX-Konto prüfen. Neue Zugangswerte ausschließlich in der privaten lokalen Konfiguration hinterlegen, niemals im Chat oder Git. Ein fehlgeschlagener Abruf ist kein Nachweis, dass ein DHL-Beleg fehlt.
+
 ```powershell
 .venv/Scripts/python.exe -X utf8 scripts/find_dhl_receipt.py 'SENDUNGSNUMMER' --download --output-dir C:/bk/belegpruefung/dhl
 ```

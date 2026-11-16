@@ -2,6 +2,10 @@
 
 ## Unveröffentlicht
 
+- GMX-IMAP verwendet geprüfte TLS-Zertifikate/Hostnamen mit Mozilla-Vertrauensankern,
+  lesenden Postfachzugriff und BODY.PEEK. Zugangstest und sichere Fehlerstufen
+  unterscheiden Anmeldung, TLS, Suche und Lesen; Abruffehler sind keine Beleglücken.
+
 - Verkaufsbündel zunächst ausschließlich lokal außerhalb der Repositories mit
   `prepare --local-only --output` als PDF/XML samt DHL-Kandidat vorbereiten.
   Hashgebundene Übernahme nach einer gemeinsamen Freigabe; dieselbe Freigabe

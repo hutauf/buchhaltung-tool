@@ -50,7 +50,8 @@ def read_checks(order, settings) -> dict:
             except (json.JSONDecodeError, TypeError):
                 failure = {}
             if failure.get("error") == "Der Postfachzugriff ist fehlgeschlagen.":
-                checks["dhl"] = {"count": 0, "status": "mailbox_unavailable", "error_type": "imap_error"}
+                checks["dhl"] = {"count": 0, "status": "mailbox_unavailable", "error_type": "imap_error",
+                                 "imap_stage": failure.get('imap_stage', 'unknown')}
                 checks["dhl_status"] = "mailbox_unavailable"
                 checks["dhl_checked"] = False
             else:
