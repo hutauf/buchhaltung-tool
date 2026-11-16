@@ -19,6 +19,7 @@ from autobookkeeping.handover import read_handover
 from autobookkeeping.config import load_settings
 from autobookkeeping.ebay_client import EbayTradingClient
 from autobookkeeping.local_invoices import LocalInvoices, WorkflowError
+from autobookkeeping.local_preparation import prepare_external, read_preparation, adopt_preparation
 from autobookkeeping.adjustments import Adjustments, change_tax_profile
 from autobookkeeping.cashflow import record_cash, void_cash
 from autobookkeeping.vine_backend import VineBackendClient, candidate_matches, match_recommendation
@@ -80,9 +81,15 @@ def main() -> dict:
     p = sub.add_parser("prepare"); p.add_argument("order_id")
     p.add_argument("--receipt", type=Path); p.add_argument("--receipt-metadata", type=Path)
     p.add_argument("--vat-rates", nargs="+", type=int); p.add_argument("--replacement-of")
+    p.add_argument('--local-only', action='store_true', help='Nur externe lokale Dateien erstellen; kein Datenrepo/Push')
+    p.add_argument('--output', type=Path)
     p = sub.add_parser('manual-prepare', help='Manuelle Rechnung ohne eBay/DHL/Vine als unverbindlichen Entwurf erfassen')
     p.add_argument('--interactive', action='store_true'); p.add_argument('--metadata', type=Path)
     p.add_argument('--vat-rates', nargs='+',type=int); p.add_argument('--replacement-of')
+    p.add_argument('--local-only', action='store_true'); p.add_argument('--output', type=Path)
+    p = sub.add_parser('adopt', help='Lokal geprüfte Vorbereitung nach derselben Bündelfreigabe übernehmen')
+    p.add_argument('--preparation', required=True, type=Path); p.add_argument('--revision', required=True)
+    p.add_argument('--approved', action='store_true')
     p = sub.add_parser("adjustment-prepare")
     p.add_argument("invoice_id"); p.add_argument("--kind", choices=("cancellation", "partial_refund", "correction"), required=True)
     p.add_argument("--metadata", type=Path); p.add_argument('--interactive',action='store_true')
@@ -109,6 +116,9 @@ def main() -> dict:
     p = sub.add_parser("expense")
     p.add_argument("invoice_id"); p.add_argument("--receipt-sha256", required=True); p.add_argument("--approved", action="store_true")
     args = parser.parse_args()
+    local_only = getattr(args, 'local_only', False)
+    if args.command in ('prepare', 'manual-prepare') and local_only != bool(args.output):
+        raise WorkflowError('--local-only und --output gemeinsam angeben')
     ROOT = data_root()
     (ROOT / "output").mkdir(exist_ok=True)
     payload = None
@@ -132,7 +142,7 @@ def main() -> dict:
                 payload=guided.adjustment(catalog,args.invoice_id,args.kind)
     if args.command == "recover" and (ROOT / "output/publication.json").exists():
         return {"ok": True, "publication": resume(ROOT)}
-    with Publication(ROOT, "local invoice " + args.command, enabled=args.command in ['configure', 'prepare', 'manual-prepare', 'adjustment-prepare', 'adjustment-issue', 'tax-profile', 'cash-record', 'cash-void', 'discard', 'activate', 'issue', 'expense', 'recover']) as publication:
+    with Publication(ROOT, "local invoice " + args.command, enabled=not local_only and args.command in ['configure', 'prepare', 'manual-prepare', 'adopt', 'adjustment-prepare', 'adjustment-issue', 'tax-profile', 'cash-record', 'cash-void', 'discard', 'activate', 'issue', 'expense', 'recover']) as publication:
         with FileLock(ROOT / "output/archive.lock", timeout=0):
             archive = Archive(ROOT); workflow = LocalInvoices(archive)
             if args.command == "recover":
@@ -166,9 +176,24 @@ def main() -> dict:
                         if metadata["verified"] is not True or metadata["vat_rate"] != 0:
                             raise WorkflowError("Nur einzeln geprüfte DHL-Originale mit 0 % Steuer vormerken")
                         attachment = (metadata, outside(ROOT, args.receipt).read_bytes())
-                    result = workflow.prepare(order, checks, attachment, args.vat_rates, args.replacement_of)
+                    if local_only:
+                        result = prepare_external(workflow, args.output, lambda staged:
+                            staged.prepare(order, checks, attachment, args.vat_rates, args.replacement_of))
+                    else:
+                        result = workflow.prepare(order, checks, attachment, args.vat_rates, args.replacement_of)
                 elif args.command == 'manual-prepare':
-                    result=workflow.prepare_manual(payload,args.vat_rates,args.replacement_of)
+                    if local_only:
+                        result = prepare_external(workflow, args.output, lambda staged:
+                            staged.prepare_manual(payload, args.vat_rates, args.replacement_of))
+                    else:
+                        result=workflow.prepare_manual(payload,args.vat_rates,args.replacement_of)
+                elif args.command == 'adopt':
+                    if not args.approved:
+                        raise WorkflowError('Übernahme benötigt die konkrete Bündelfreigabe')
+                    plan, _ = read_preparation(archive, args.preparation, args.revision)
+                    invoice = plan['invoice']
+                    order = None if invoice.get('entry_source') == 'manual' else EbayTradingClient(load_settings()).get_order(invoice['order_id'])
+                    result = adopt_preparation(workflow, args.preparation, args.revision, order, args.approved)
                 elif args.command == "adjustment-prepare":
                     result = Adjustments(workflow).prepare(args.invoice_id, args.kind, payload)
                 elif args.command == "adjustment-issue":

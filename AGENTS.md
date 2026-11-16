@@ -1,6 +1,7 @@
 # Buchhaltungswerkzeug
 
 - Produktiver Betrieb: Das lokale System mit eigenständigem privatem `daten/` ist führend. Invoiz und Norman sind deaktiviert; keine Dienstadapter rekonstruieren. Aktuelle operative Regeln ausschließlich in `daten/AGENTS.md` und `daten/buchhaltung/AGENTS.md` lesen. Ein Freigabebündel umfasst Rechnung, passende DHL-Ausgabe und alle ausgewählten Vine-Positionen; Gesamtabschluss anhand der tatsächlichen Datensätze prüfen, nicht allein anhand eines Statusfelds.
+- Verkaufsbündel vor Freigabe vollständig lokal außerhalb beider Repos vorbereiten: `local_invoice.py prepare ... --local-only --output EXTERNER_ORDNER`. PDF/XML, DHL-Original samt Zahlungsnachweis und Vine-Zuordnung sammeln; keine neuen Rechnungs-/Ausgabenentwürfe vorab im Datenrepo archivieren. Ein einfaches „Freigabe“ für das konkrete vollständige Bündel autorisiert Übernahme, Rechnung, DHL-Ausgabe einschließlich der vorgelegten belegten Zahlungsdaten und ausgewählte Vine-Verkäufe zusammen. Keine zweite Freigabe für einen bereits enthaltenen Schritt verlangen. Ablauf: `docs/freigabebuendel.md`.
 
 - Mit dem Nutzer auf Deutsch arbeiten. Toolcode und Datenrepo sind unabhängig.
 - Eigene neue Rechnungen und die geplante EÜR-Auswertung ausschließlich für Kleinunternehmer nach § 19 UStG. Einfache Einnahmen-/Ausgabenaufzeichnung ohne Kontenrahmen im Nutzerablauf. Amazon-/Vine-Produkttester-Leistungsumsätze einschließlich Reverse-Charge-Umsätzen bleiben vorerst außerhalb des Umfangs; keine automatische Übernahme. Original-Steuerangaben vorhandener und eingehender Belege erhalten.

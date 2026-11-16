@@ -550,6 +550,10 @@ class LocalInvoices:
             if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", receipt["pay_date"]):
                 raise WorkflowError("Geprüftes Zahlungsdatum muss als ISO-Kalendertag vorliegen")
             datetime.fromisoformat(receipt["pay_date"])
+            if not isinstance(receipt.get('payment_evidence'), str) or not receipt['payment_evidence'].strip():
+                raise WorkflowError('DHL-Zahlung benötigt einen vor der Bündelfreigabe geprüften Nachweis')
+            if amount(receipt.get('paid_amount', receipt['gross'])) != amount(receipt['gross']):
+                raise WorkflowError('Abweichende DHL-Zahlung gesondert vorbereiten')
         if not all(isinstance(receipt.get(k), str) and receipt[k].strip() for k in ("payee", "product", "cart_id")):
             raise WorkflowError("Beleglieferant, Produkt oder Warenkorb-ID fehlt")
         state = after["local_workflow"][invoice_id]
@@ -574,6 +578,8 @@ class LocalInvoices:
                "coverage": "complete", "recorded_at": now(), "source_record": receipt}
         if receipt.get("pay_date"):
             row["pay_date"] = receipt["pay_date"]
+            row['paid_amount'] = amount(receipt.get('paid_amount', receipt['gross']))
+            row['payment_evidence'] = receipt['payment_evidence']
         after["records"][rid] = {"current": row, "history": []}
         # A receipt booking cannot certify that external Vine writes completed.
         state.update(status="ausgabe_angelegt", expense_id=rid)

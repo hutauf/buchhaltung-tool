@@ -49,7 +49,7 @@ Einrichtung und Abruf buchen noch keine Rechnung oder Ausgabe. [Vine ist optiona
 .venv/Scripts/buchhaltung.exe dashboard
 ```
 
-`daten/dashboard.html` per Doppelklick öffnen. Die Seite zeigt den Bestand und die passenden kopierbaren Befehle für Änderungen. Rechnungsabschlüsse, Ausgaben und Zahlungen verlangen eine konkrete Freigabe. Vor dem ersten produktiven Rechnungsabschluss ist die geprüfte Nummernübernahme erforderlich. Die vollständigen Abläufe stehen im [Handbuch](docs/handbuch.md).
+`daten/dashboard.html` per Doppelklick öffnen. Die Seite zeigt den Bestand und die passenden kopierbaren Befehle für Änderungen. Ein [vollständig lokal vorbereitetes Verkaufsbündel](docs/freigabebuendel.md) benötigt eine gemeinsame Freigabe für Rechnung, DHL-Ausgabe samt vorgelegten belegten Zahlungsdaten und ausgewählte Vine-Verkäufe. Vor dieser Freigabe bleiben die Vorbereitungsdateien außerhalb beider Repos. Vor dem ersten produktiven Rechnungsabschluss ist die geprüfte Nummernübernahme erforderlich. Die vollständigen Abläufe stehen im [Handbuch](docs/handbuch.md).
 
 ## Warum diesem Werkzeug vertrauen?
 

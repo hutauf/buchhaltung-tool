@@ -10,6 +10,10 @@ Der aktuelle Umfang sind **einzelne EÜR-Einträge**, vor allem Verkäufe und zu
 
 F?r die erste Einrichtung siehe die [README](../README.md) und die [Einrichtungsanleitung](einrichtung.md).
 
+## Einmalige Freigabe eines Verkaufsbündels
+
+Die [Bündelvorbereitung](freigabebuendel.md) sammelt Rechnungs-PDF/XML, passenden DHL-Beleg samt belegten Zahlungsdaten und eindeutige Vine-Zuordnung zuerst lokal außerhalb der Repos. Dafür `local_invoice.py prepare ... --local-only --output EXTERNER_NEUER_ORDNER` verwenden; bei Abholung `manual-prepare` mit denselben Optionen. Erst nach Beseitigung aller Blocker genügt ein einfaches „Freigabe“ für sämtliche konkret vorgelegten Schritte. Die geprüfte lokale Revision mit `adopt --preparation JSON --revision HASH --approved` übernehmen und unter derselben Freigabe Rechnung, DHL-Ausgabe/Zahlungsdaten und Vine abschließen. Kein zweiter Freigabedialog für einen enthaltenen Schritt.
+
 ## Originale, E-Rechnungen und Aufbewahrung
 
 `buchhaltung beleg inspect PFAD` liest auch eigenständige UBL-/CII-Rechnungs-XML und Rechnungs-XML aus PDF-Anhängen. Gültige strukturierte Daten werden nach lokaler XSD-/EN16931-Prüfung in der Metadatenvorlage vorbefüllt; Zahlung, Kategorie und betrieblicher Bezug bleiben zu bestätigen. Ein PDF ohne Rechnungs-XML bleibt ein PDF-Original. Eine nachträglich erzeugte XML ersetzt niemals das empfangene Original.

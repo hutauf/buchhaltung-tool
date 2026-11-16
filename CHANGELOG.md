@@ -2,6 +2,12 @@
 
 ## Unveröffentlicht
 
+- Verkaufsbündel zunächst ausschließlich lokal außerhalb der Repositories mit
+  `prepare --local-only --output` als PDF/XML samt DHL-Kandidat vorbereiten.
+  Hashgebundene Übernahme nach einer gemeinsamen Freigabe; dieselbe Freigabe
+  umfasst Rechnung, DHL-Ausgabe mit vorgelegten belegten Zahlungsdaten und
+  ausgewählte Vine-Verkäufe. Dokumentation und Betriebsanweisungen präzisiert.
+
 - Internationaler eBay-Versand: Verkäufererlös und Versandkosten aus der
   Inlandsstufe lesen und bei bezahlten Verkäufen mit der Verkäuferzahlung
   abgleichen. Weiterleitungsentgelt und von eBay eingezogene Steuern gehören
