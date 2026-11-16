@@ -2,6 +2,11 @@
 
 ## Unveröffentlicht
 
+- Vollständige Audit-Replays verwenden bytegleiche JSON-Fragmente unveränderter
+  Datensätze erneut. Ereigniskette, Vor-/Nachzustände und aktueller Katalog werden
+  weiterhin vollständig geprüft; historische Hashes und das Archivformat bleiben
+  erhalten. Der Zwischenspeicher gilt ausschließlich für den einzelnen Prüflauf.
+
 - GMX-IMAP verwendet geprüfte TLS-Zertifikate/Hostnamen mit Mozilla-Vertrauensankern,
   lesenden Postfachzugriff und BODY.PEEK. Zugangstest und sichere Fehlerstufen
   unterscheiden Anmeldung, TLS, Suche und Lesen; Abruffehler sind keine Beleglücken.

@@ -2,11 +2,83 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 from datetime import datetime, timezone
 
 from autobookkeeping.archive import encoded, sha
 
 FIELD = "audit_trail"
+
+
+class _ReplayEncoding:
+    """Reuse unchanged JSON fragments while fully replaying the version-1 chain.
+
+    Fragments have exactly the whitespace/escaping of ``encoded``. Only the
+    first two dictionary levels are split, so a record is serialized once until
+    a change touches it. This cache belongs to one replay, never to a previous
+    verification, and contains no trusted digests or skipped events.
+    """
+
+    def __init__(self, snapshot):
+        self.snapshot = snapshot
+        self.sections = {}
+        self.prefixes = {}
+
+    def changed(self, path):
+        section = self.sections.get(path[0])
+        if len(path) > 1 and isinstance(section, dict):
+            section.pop(path[1], None)
+        else:
+            self.sections.pop(path[0], None)
+
+    def _prefix(self, key, depth):
+        cache_key = (key, depth)
+        if cache_key not in self.prefixes:
+            self.prefixes[cache_key] = b" " * (2 * depth) + encoded(key)[:-1] + b": "
+        return self.prefixes[cache_key]
+
+    @staticmethod
+    def _value(value, depth):
+        return encoded(value)[:-1].replace(b"\n", b"\n" + b" " * (2 * depth))
+
+    def pieces(self):
+        if any(not isinstance(key, str) for key in self.snapshot):
+            yield encoded(self.snapshot)
+            return
+        if not self.snapshot:
+            yield b"{}\n"
+            return
+        yield b"{\n"
+        keys = sorted(self.snapshot)
+        for index, key in enumerate(keys):
+            yield self._prefix(key, 1)
+            value = self.snapshot[key]
+            if isinstance(value, dict) and all(isinstance(k, str) for k in value):
+                section = self.sections.setdefault(key, {})
+                if not value:
+                    yield b"{}"
+                else:
+                    yield b"{\n"
+                    children = sorted(value)
+                    for child_index, child in enumerate(children):
+                        yield self._prefix(child, 2)
+                        if child not in section:
+                            section[child] = self._value(value[child], 2)
+                        yield section[child]
+                        yield b",\n" if child_index + 1 < len(children) else b"\n"
+                    yield b"  }"
+            else:
+                if key not in self.sections:
+                    self.sections[key] = self._value(value, 1)
+                yield self.sections[key]
+            yield b",\n" if index + 1 < len(keys) else b"\n"
+        yield b"}\n"
+
+    def digest(self):
+        digest = hashlib.sha256()
+        for piece in self.pieces():
+            digest.update(piece)
+        return digest.hexdigest()
 
 
 def state(catalog):
@@ -60,6 +132,8 @@ def validate(catalog):
             or not isinstance(trail.get("events"), list) or not trail["events"]):
         raise ValueError("Unbekanntes Änderungsprotokoll")
     snapshot = copy.deepcopy(trail["baseline"])
+    encoding = _ReplayEncoding(snapshot)
+    snapshot_digest = encoding.digest()
     previous = None
     for sequence, event in enumerate(trail["events"], 1):
         body = {key: value for key, value in event.items() if key != "sha256"}
@@ -68,14 +142,17 @@ def validate(catalog):
         timestamp = datetime.fromisoformat(event["at"])
         if timestamp.tzinfo is None:
             raise ValueError("Änderungsprotokoll-Zeitpunkt benötigt Zeitzone")
-        if sha(encoded(snapshot)) != event["before_sha256"]:
+        # The snapshot has not changed since the preceding after-state check.
+        if snapshot_digest != event["before_sha256"]:
             raise ValueError("Änderungsprotokoll-Ausgangsstand stimmt nicht")
         for change in event["changes"]:
             apply(snapshot, change)
-        if sha(encoded(snapshot)) != event["after_sha256"]:
+            encoding.changed(change["path"])
+        snapshot_digest = encoding.digest()
+        if snapshot_digest != event["after_sha256"]:
             raise ValueError("Änderungsprotokoll-Ergebnis stimmt nicht")
         previous = event["sha256"]
-    if encoded(snapshot) != encoded(state(catalog)):
+    if b"".join(encoding.pieces()) != encoded(state(catalog)):
         raise ValueError("Datenbank weicht vom Änderungsprotokoll ab")
     return {"status": "verified", "events": len(trail["events"]), "head_sha256": previous}
 
