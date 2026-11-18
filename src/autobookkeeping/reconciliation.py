@@ -6,8 +6,8 @@ from autobookkeeping.archive import encoded, sha
 from autobookkeeping.local_invoices import now, record_context, WorkflowError
 
 STATES = {'unpaid', 'matched', 'amount_mismatch', 'ambiguous', 'draft',
-          'external_reference', 'missing_invoice', 'private', 'missing_original', 'adjusted'}
-FINDINGS = STATES - {'unpaid', 'matched', 'private'}
+          'external_reference', 'missing_invoice', 'private', 'missing_original', 'adjusted', 'cancelled'}
+FINDINGS = STATES - {'unpaid', 'matched', 'private', 'cancelled'}
 
 
 def identity(row):
@@ -43,6 +43,10 @@ def compare(catalog, orders, checklist):
                        or i.get('local_invoice_id') == row['id']]
             if matches(context, record_context(row)) or related: found.append(row)
         state = 'unpaid' if order.paid_at is None else 'missing_invoice'
+        # Only an unpaid API-confirmed cancellation can close the payment case.
+        # A paid cancellation still needs its invoice/refund comparison below.
+        if order.paid_at is None and order.order_status == 'Cancelled':
+            state = 'cancelled'
         if order.paid_at is not None:
             from autobookkeeping.adjustments import fully_cancelled, credits
             cancelled = [r for r in found if r.get('status') == 'cancelled' or fully_cancelled(catalog, r['id'])]

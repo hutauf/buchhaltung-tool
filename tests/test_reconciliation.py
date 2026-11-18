@@ -105,3 +105,28 @@ def test_cancelled_replacement_chain_is_distinct_from_unrelated_duplicate_invoic
     assert compare(catalog,[order()],{'items':[]})[0]['state']=='ambiguous'
     replacement['status']='cancelled'
     assert compare(catalog,[order()],{'items':[]})[0]['state']=='ambiguous'
+
+
+def test_unpaid_api_cancellation_is_closed_but_paid_cancellation_stays_checked(tmp_path):
+    catalog = {'records': {}}
+    cancelled = replace(order(), paid_at=None, order_status='Cancelled')
+    result = compare(catalog, [cancelled], {'items': []})
+    assert result[0]['state'] == 'cancelled'
+    assert compare(catalog, [replace(cancelled, order_status='Active')], {'items': []})[0]['state'] == 'unpaid'
+    paid = replace(order(), order_status='Cancelled')
+    assert compare(catalog, [paid], {'items': []})[0]['state'] == 'missing_invoice'
+    record = dict(id='synthetic-invoice', kind='invoice', gross='11.00', status='issued',
+                  coverage='complete', order_id=paid.order_id)
+    catalog['records'][record['id']] = {'current': record}
+    assert compare(catalog, [paid], {'items': []})[0]['state'] == 'matched'
+    before = catalog['records'].copy()
+    archive = Archive(tmp_path/'repo', 'synthetic-password')
+    archive.repo.mkdir(); archive.init()
+    client = SimpleNamespace(get_orders=lambda **kw: [cancelled], orders_complete=True,
+                             order_window={}, order_pages=[b'<SyntheticCancelled/>'])
+    saved = scan(archive, client, {'items': []}, 90, True)
+    assert saved['counts'] == {'cancelled': 1}
+    assert archive.catalog()['records'] == {} and findings(archive.catalog()) == []
+    assert archive.verify()['ok']
+    assert public_status(archive.catalog())['open_findings'] == 0
+    assert catalog['records'] == before

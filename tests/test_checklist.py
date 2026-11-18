@@ -30,6 +30,18 @@ class ChecklistStoreTests(unittest.TestCase):
         self.assertEqual("privat", refreshed["status"])
         self.assertEqual("Privatverkauf", refreshed["note"])
 
+    def test_cancelled_identity_survives_alias_refresh_without_an_invoice(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = ChecklistStore(Path(directory) / "checklist.json")
+            store.upsert("SYNTHETIC-CANCELLED", {"status": "storniert", "order_status": "Cancelled",
+                                                "sales_record_number": "SYNTHETIC-SRN"})
+            refreshed = store.upsert("SYNTHETIC-ALIAS", {"sales_record_number": "SYNTHETIC-SRN"})
+            self.assertEqual("storniert", refreshed["status"])
+            self.assertEqual("Cancelled", refreshed["order_status"])
+            self.assertEqual("storniert", store.find("SYNTHETIC-ALIAS")["status"])
+            self.assertNotIn("invoice_id", refreshed)
+            self.assertNotIn("expense_id", refreshed)
+
     def test_records_multiple_vine_sales_for_one_order(self):
         with tempfile.TemporaryDirectory() as directory:
             store = ChecklistStore(Path(directory) / "checklist.json")

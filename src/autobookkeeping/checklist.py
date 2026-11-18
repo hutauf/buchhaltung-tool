@@ -16,6 +16,7 @@ def default_checklist():
 STATUSES = {
     "offen",
     "privat",
+    "storniert",
     "rechnung_angelegt",
     "rechnung_abgeschlossen",
     "ausgabe_angelegt",
