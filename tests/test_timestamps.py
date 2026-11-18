@@ -64,3 +64,55 @@ def test_proof_digest_binding_and_status_rereads_upgraded_file(tmp_path):
     statement.write_bytes(b"changed Git checkpoint")
     with pytest.raises(ValueError):
         load_proof(statement, proof)
+
+
+def cached_proof(tmp_path):
+    from autobookkeeping.archive import sha
+    statement = tmp_path / ('a' * 40 + '.json'); statement.write_bytes(b'{"synthetic":true}')
+    proof = statement.with_suffix('.json.ots')
+    detached = DetachedTimestampFile.from_fd(OpSHA256(), io.BytesIO(statement.read_bytes()))
+    detached.timestamp.attestations.add(BitcoinBlockHeaderAttestation(0))
+    context = BytesSerializationContext(); detached.serialize(context); proof.write_bytes(context.getbytes())
+    entry = {'checked_at': '2011-01-01T00:00:00+00:00', 'statement_sha256': sha(statement.read_bytes()),
+             'proof_sha256': sha(proof.read_bytes()), 'blockchain_verified': True,
+             'verification_mode': 'public_explorers', 'block_height': 0, 'confirmations': 6}
+    return statement, proof, entry
+
+
+@pytest.mark.parametrize('changed', ['none', 'statement', 'proof', 'height', 'confirmations', 'mode', 'success', 'malformed', 'date'])
+def test_cache_reuse_is_bound_to_exact_proof_and_successful_six_confirmation_check(tmp_path, changed):
+    from autobookkeeping.timestamps import cache_matches
+    statement, proof, entry = cached_proof(tmp_path)
+    if changed == 'statement': statement.write_bytes(b'changed')
+    elif changed == 'proof': proof.write_bytes(b'changed')
+    elif changed == 'height': entry['block_height'] = 1
+    elif changed == 'confirmations': entry['confirmations'] = 5
+    elif changed == 'mode': entry['verification_mode'] = 'other'
+    elif changed == 'success': entry['blockchain_verified'] = False
+    elif changed == 'malformed': entry = None
+    elif changed == 'date': entry['checked_at'] = '2011-01-01'
+    assert cache_matches(entry, statement.read_bytes(), proof.read_bytes()) is (changed == 'none')
+
+
+def test_staged_timestamp_summary_uses_two_git_processes_and_ignores_worktree(tmp_path, monkeypatch):
+    import json
+    import subprocess
+    import autobookkeeping.timestamps as module
+    subprocess.run(['git', 'init', str(tmp_path)], check=True, capture_output=True)
+    root = tmp_path / 'buchhaltung/nachweise'; root.mkdir(parents=True)
+    statement, proof, entry = cached_proof(root)
+    (tmp_path / 'timestamp-status.json').write_text(json.dumps({'version': 1, 'entries': {statement.stem: entry}}))
+    subprocess.run(['git', '-C', str(tmp_path), 'add', '.'], check=True, capture_output=True)
+    # A second, missing proof is invalid; an unstaged successful cache must not count.
+    missing = root / ('b' * 40 + '.json'); missing.write_bytes(b'{}')
+    subprocess.run(['git', '-C', str(tmp_path), 'add', str(missing)], check=True, capture_output=True)
+    statement.write_bytes(b'unstaged change'); proof.write_bytes(b'unstaged invalid proof')
+    (tmp_path / 'timestamp-status.json').write_text('{}')
+    calls = []; original = module.subprocess.run
+    def counted(args, **kwargs):
+        calls.append(args)
+        return original(args, **kwargs)
+    monkeypatch.setattr(module.subprocess, 'run', counted)
+    assert module.dashboard_status(tmp_path, staged=True) == {
+        'total': 2, 'verified': 1, 'pending': 0, 'unverified': 0, 'invalid': 1}
+    assert len(calls) == 2

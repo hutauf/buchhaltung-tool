@@ -1,6 +1,6 @@
 # Verfahrensdokumentation der lokalen Belegablage
 
-Version 17 · Technikstand 18.11.2026, rechtliche Grundlagen zuletzt geprüft am 21.10.2026. Sicherheitsbeschreibung mit Implementierung und OpenTimestamps-Primärdokumentation am 19.10.2026 abgeglichen. Änderungen dieser Beschreibung werden mit der Toolhistorie versioniert. Die im privaten Workspace verwendete Toolrevision steht in `tool-version.json`.
+Version 18 · Technikstand 18.11.2026, rechtliche Grundlagen zuletzt geprüft am 21.10.2026. Sicherheitsbeschreibung mit Implementierung und OpenTimestamps-Primärdokumentation am 19.10.2026 abgeglichen. Änderungen dieser Beschreibung werden mit der Toolhistorie versioniert. Die im privaten Workspace verwendete Toolrevision steht in `tool-version.json`.
 
 Der produktive Betrieb verwendet ausschließlich das lokale Tool und das eigenständige private Datenrepository. Frühere Rechnungsdienste sind deaktiviert; importierte Herkunftskennungen bleiben erhalten. Eine konkrete Abschlussfreigabe umfasst Rechnung, passende verifizierte Versandkosten und die ausgewählten Vine-Verkaufsdatensätze. Fehlende Komponenten werden ausdrücklich als offen gemeldet. Eine gebuchte DHL-Ausgabe erhält intern `ausgabe_angelegt`; sie bescheinigt keinen externen Vine-Abschluss. Der Vine-Schreibhelfer prüft vor Schreibbeginn die private Veröffentlichung, liest jede Änderung zurück und veröffentlicht die verschlüsselte lokale Verknüpfung über den regulären Git-/OTS-Ablauf. Ausstehende Bitcoin-Bestätigung wird getrennt vom erfolgreichen Datenpush ausgewiesen. Die tägliche Verkaufsüberwachung speichert technische Kontrollnachweise und darf bei entsprechender Beauftragung unverbindliche Rechnungsentwürfe und geprüfte DHL-Belegkandidaten vorbereiten. Finanzielle Festschreibung und Vine-Schreibvorgänge benötigen die konkrete Freigabe. Technische Fehler werden im Rahmen der beauftragten Pflege mit Prüfung, Tests und regulärer Codeveröffentlichung behoben; anschließend wird die Vorbereitung fortgesetzt.
 
@@ -222,6 +222,42 @@ Freigabe, Kontrolle im Archiv oder neuen Bitcoin-Nachweis. Tatsächliche Änderu
 erfolgen weiterhin mit geprüften CLI-Befehlen und deren Veröffentlichungsprozess.
 Neue Daten erfordern die erneute Erzeugung des Dashboards.
 
+Der verwaltete Daten-Pre-Commit-Hook erzeugt und prüft das Dashboard einmal aus
+dem tatsächlich zu committenden Git-Index; der Veröffentlichungshelfer vermeidet
+in diesem Fall einen zusätzlichen vorherigen Komplettbau. Bei fehlenden oder
+abweichenden eigenen Hooks bleibt der bisherige eigenständige Bau erhalten.
+Bei Datenänderungen werden Inventar, Originalhashes, Entschlüsselbarkeit,
+Finanzverknüpfungen und die vollständige Änderungshistorie weiterhin geprüft.
+
+Innerhalb genau eines laufenden Veröffentlichungs-/Wiederaufnahmevorgangs dürfen
+erfolgreiche Historienprüfungen für einen bereits vollständig geprüften,
+bytegleichen Katalog im Arbeitsspeicher wiederverwendet werden. Der Schlüssel
+ist SHA-256 der kanonischen vollständigen Katalogserialisierung einschließlich
+Basisstand, sämtlichen Ereignissen und aktuellen Daten; nicht nur der letzte
+Ereignishash oder eine Objektidentität. Jeder abweichende Stand wird vollständig
+neu geprüft. Fehler werden nicht zwischengespeichert; höchstens acht Ergebnisse
+bleiben bis zum Vorgangsende erhalten und werden auch bei Abbruch verworfen.
+Es gibt dafür keine Cachedatei oder Übernahme aus früheren Prozessen. Die
+Inventar-, Originaldatei- und Finanzverknüpfungsprüfungen laufen weiterhin bei
+jedem Archivprüfaufruf.
+
+Bei ausschließlich geänderten Zeitnachweisen bzw. deren Verifikationscache darf
+der Hook die Finanzprojektion aus dem bereits committeten Dashboard übernehmen.
+Voraussetzungen sind unveränderte Archivpfade im Git-Index gegenüber HEAD und
+eine übereinstimmende SHA-256-Bindung an Datenbank, Manifest, Schlüsselhülle und
+sämtliche Generatorquellen einschließlich Vorlage und öffentlicher
+Verfahrensbeschreibung. Die Projektion wird niemals aus lokal oder im Index
+geändertem HTML übernommen. Eine zusätzliche SHA-256-Bindung umfasst den Inhalt
+der übernommenen Finanzprojektion samt Quellenbindung und Passwortprüfwert;
+ein beschädigter committeter Anzeigestand führt ebenfalls zur Vollprüfung.
+Zeitnachweiszahlen werden aus dem aktuellen Index
+neu berechnet; Dateien werden gesammelt über Git gelesen. Fehlende Bindung,
+Archiv-/Generatoränderung oder ein Altbestand ohne diese Bindung führen zur
+vollständigen bisherigen Dashboard-Prüfung. Der Veröffentlichungshelfer prüft
+bei Nachweisänderungen zusätzlich das aktuelle Archiv; finanzielle Daten und
+Audit-Historien werden dabei nicht verändert. Der Mechanismus ist keine
+dauerhafte Freistellung von Archivprüfungen.
+
 Der betriebliche Verantwortliche legt Quellen, Berechtigte, Eingangskontrolle, Erfassungsfristen und Vertretung in der privaten Ergänzung fest. Der Agent bereitet vor; er darf eine allgemeine Wartungsanweisung nicht als konkrete Rechnungs-/Ausgabenfreigabe behandeln. Der tägliche Verkaufsabgleich wird über den ausdrücklich eingerichteten Scheduler aufgerufen. Eingereichte Kostenbelege werden einzeln geprüft; kein automatischer Gebührenimport. Originalrechnungen und tatsächlich verfügbare Zahlungen sind anhand der jeweiligen Quellen zu prüfen. Fehlende Originale und unverarbeitete Vorgänge dokumentieren. Integritätsprüfung allein stellt keine Vollständigkeit fest.
 
 Bei jedem Abschluss Prüfbasis und Freigabe festhalten, Pipelineergebnis lesen und Fehler beheben. Periodisch Vollständigkeit und Summen mit den außerhalb dieses Tools geführten übrigen Geschäftsvorfällen abgleichen. Die genaue Verantwortlichkeit, Häufigkeit, Ausnahmen und tatsächlichen Ergebnisse gehören in die private Betriebsdokumentation. Diese Anforderungen sind noch keine Bestätigung ihrer Durchführung.
@@ -256,7 +292,31 @@ Die Schutzwirkung setzt einen bestätigten Bitcoin-Anker, die Prüfung der genau
 
 Die gespeicherten Dateien liegen auf gewöhnlichen Datenträgern und können mit ausreichenden Rechten technisch verändert oder gelöscht werden. Die Hash-/Zeitnachweiskette verhindert, dass ein abweichender Stand den erhaltenen alten Nachweis besteht; Sicherungen schützen zusätzlich vor Verlust und ermöglichen den Vergleich mit älteren Ständen. Deshalb werden Nachweisdateien, OTS-Beweise und historische Git-Objekte zusammen mit den Daten aufbewahrt und unabhängig gesichert. Integritätssicherung und Wiederherstellbarkeit ergänzen sich. Der Existenznachweis bestätigt den gesicherten Inhalt; fachliche Richtigkeit, Zahlung, fristgerechte Erfassung und Quellenabgleich werden durch die übrigen Kontrollen geprüft. Kalender erhalten Hashwerte, keine Belege.
 
-`veroeffentlichen confirm` aktualisiert OTS-Dateien und prüft Bitcoin-Anker samt historischem Gitbezug über zwei öffentliche Blockquellen. Sein privater Verifikationscache bindet das Ergebnis an SHA256 der genauen Nachweis- und OTS-Datei. Das Dashboard zählt nur übereinstimmende gespeicherte Verifikationen als geprüft; geänderte Beweise werden nicht mit einem alten Cache bestätigt. Nachweis-/Cache-/Dashboardänderungen erhalten einen eigenen privaten Nachweisupdate-Commit ohne neue finanzielle Buchung und ohne rekursiv immer neue Zeitstempel zu erzeugen. Die öffentlichen Quellen ersetzen keinen unabhängig betriebenen Bitcoin-Vollknoten.
+`veroeffentlichen confirm` aktualisiert offene oder geänderte OTS-Dateien und
+prüft Bitcoin-Anker samt historischem Gitbezug über zwei öffentliche Blockquellen.
+Erfolgreiche Verifikationen werden nur bei identischen SHA-256-Prüfsummen der
+genauen Nachweis- und OTS-Datei, passender Bitcoin-Attestierung, Prüfmodus und
+mindestens sechs bestätigten Blöcken wiederverwendet. Der Zeitpunkt und die
+Bestätigungszahl der tatsächlichen früheren Prüfung bleiben erhalten; eine
+Wiederverwendung behauptet keine neue Netzwerk-/Git-Prüfung. Der Cache ersetzt
+nicht die historischen Git-Objekte und Sicherungen. `veroeffentlichen confirm
+--full` erzwingt die erneute Kalender-, historische Git- und Bitcoin-Prüfung aller
+Nachweise, etwa zur gesonderten Integritätskontrolle einschließlich möglicher
+Blockchain-Neuorganisationen. Ein Kalender-Timeout bleibt offen und blockiert
+nicht die Prüfung der übrigen Nachweise. Werden ausschließlich unveränderte,
+bestätigte Ergebnisse wiederverwendet, werden Cache und Dashboard nicht erneut
+geschrieben oder committet. Tatsächliche neue Prüfversuche behalten ihren
+Prüfzeitpunkt, auch wenn die Bestätigung weiterhin aussteht.
+
+Der normale Rechnungsabschluss wartet weiterhin nur auf die Annahme des
+Kalendernachweises und dessen private Veröffentlichung, nicht auf neue
+Bitcoin-Blöcke. `confirm` wird getrennt von den einzelnen Rechnungsschritten
+ausgeführt, beispielsweise bei der täglichen Betreuung. Das Dashboard zählt nur
+übereinstimmende gespeicherte Verifikationen als historisch geprüft; geänderte
+Beweise werden nicht mit einem alten Cache bestätigt. Nachweis-/Cache-/Dashboard-
+änderungen erhalten einen eigenen privaten Nachweisupdate-Commit ohne neue
+finanzielle Buchung und ohne rekursiv immer neue Zeitstempel zu erzeugen. Die
+öffentlichen Quellen ersetzen keinen unabhängig betriebenen Bitcoin-Vollknoten.
 
 Toolupdates werden getestet und nur allgemein im öffentlichen Repo veröffentlicht. Der private Workspace dokumentiert die verwendete Toolrevision. Jede Funktionsänderung muss die öffentliche Verfahrensbeschreibung und erforderlichen privaten Betriebsangaben im selben Entwicklungsschritt prüfen und aktualisieren; organisatorische Unbekannte bleiben offen. Änderungen am Verfahren und organisatorische Abweichungen werden zusätzlich privat datiert und mit vorherigem Stand aufbewahrt. Vor Änderungen an Aufbewahrung, Export oder Rechnungsformaten vorhandene Originale und historische Nachweise verifizieren. Kein rückwirkendes Ersetzen empfangener PDFs durch selbst erzeugte XML.
 

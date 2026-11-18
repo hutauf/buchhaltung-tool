@@ -470,6 +470,100 @@ def test_initial_operating_document_commit_precedes_archive_initialization(tmp_p
     assert not (repo/'dashboard.html').exists()
 
 
+def stage_pending_proof(repo, git):
+    import io
+    from opentimestamps.core.notary import PendingAttestation
+    from opentimestamps.core.op import OpSHA256
+    from opentimestamps.core.serialize import BytesSerializationContext
+    from opentimestamps.core.timestamp import DetachedTimestampFile
+    statement = repo / 'buchhaltung/nachweise' / ('a' * 40 + '.json')
+    statement.parent.mkdir(exist_ok=True); statement.write_bytes(b'{"synthetic":true}')
+    proof = Path(str(statement) + '.ots')
+    detached = DetachedTimestampFile.from_fd(OpSHA256(), io.BytesIO(statement.read_bytes()))
+    detached.timestamp.attestations.add(PendingAttestation('https://calendar.example.invalid'))
+    context = BytesSerializationContext(); detached.serialize(context); proof.write_bytes(context.getbytes())
+    git('add', 'buchhaltung/nachweise')
+
+
+def test_proof_only_update_reuses_committed_projection_without_unlocking_archive(staged_repo, monkeypatch):
+    repo, archive, git = staged_repo
+    original = json.loads((repo/'dashboard.html').read_text(encoding='utf8').split(
+        '<script id="bookkeeping-data" type="application/json">')[1].split('</script>')[0])
+    stage_pending_proof(repo, git)
+    def forbidden(*args, **kwargs):
+        pytest.fail('Proof-only dashboard must not decrypt or replay the archive')
+    monkeypatch.setattr(Archive, 'unlock', forbidden)
+    monkeypatch.setitem(SCRIPT['build'].__globals__, 'index_catalog', forbidden)
+    result = SCRIPT['build'](repo, tool=repo, staged=True)
+    assert result['reused_projection'] is True
+    snapshot = json.loads((repo/'dashboard.html').read_text(encoding='utf8').split(
+        '<script id="bookkeeping-data" type="application/json">')[1].split('</script>')[0])
+    assert snapshot['rows'] == original['rows']
+    assert snapshot['password_check'] == original['password_check']
+    assert snapshot['timestamps']['pending'] == 1
+    SCRIPT['build'](repo, tool=repo, staged=True, check=True)
+
+
+@pytest.mark.parametrize('change', ['data', 'generator', 'legacy_html', 'committed_html', 'manifest', 'original'])
+def test_proof_projection_falls_back_for_any_changed_archive_or_generator(staged_repo, monkeypatch, change):
+    repo, archive, git = staged_repo
+    if change == 'data':
+        catalog = archive.catalog(); catalog['records']['opaque-1']['current']['gross'] = '130.00'
+        archive.save_catalog(catalog); git('add', 'buchhaltung')
+    elif change == 'generator':
+        source = repo/'docs/verfahrensdokumentation.md'
+        source.write_bytes(source.read_bytes()+b'\nSynthetic revised procedure.\n')
+        git('add', 'docs/verfahrensdokumentation.md')
+    elif change == 'legacy_html':
+        target = repo/'dashboard.html'
+        target.write_bytes(target.read_bytes().replace(b'build_source_sha256', b'old_source_sha256'))
+        git('add', 'dashboard.html'); git('commit', '-m', 'Synthetic legacy dashboard')
+    elif change == 'committed_html':
+        target = repo/'dashboard.html'
+        target.write_bytes(target.read_bytes().replace(b'"gross_cents":11900', b'"gross_cents":99999'))
+        git('add', 'dashboard.html'); git('commit', '-m', 'Synthetic damaged committed projection')
+    elif change == 'manifest':
+        path = archive.root/'manifest.json'; path.write_bytes(path.read_bytes()+b'\n')
+        git('add', 'buchhaltung/manifest.json')
+    else:
+        archive.write('2011/Unterlagen/synthetic.pdf.enc', b'SYNTHETIC ORIGINAL')
+        git('add', 'buchhaltung/2011')
+    stage_pending_proof(repo, git)
+    calls = []; original = SCRIPT['build'].__globals__['index_catalog']
+    def counted(*args, **kwargs):
+        calls.append(True)
+        return original(*args, **kwargs)
+    monkeypatch.setitem(SCRIPT['build'].__globals__, 'index_catalog', counted)
+    if change == 'original':
+        with pytest.raises(ValueError, match='inventarisiert'):
+            SCRIPT['build'](repo, tool=repo, staged=True)
+    else:
+        assert SCRIPT['build'](repo, tool=repo, staged=True)['reused_projection'] is False
+        if change == 'committed_html':
+            assert b'"gross_cents":11900' in (repo/'dashboard.html').read_bytes()
+    assert calls == [True]
+
+
+def test_proof_update_never_uses_staged_html_as_cached_financial_data(staged_repo):
+    repo, archive, git = staged_repo
+    target = repo/'dashboard.html'
+    original = target.read_bytes()
+    target.write_bytes(original.replace(b'11900', b'99999').replace(b'build_source_sha256', b'PRIVATE-INJECTION'))
+    git('add', 'dashboard.html'); stage_pending_proof(repo, git)
+    assert SCRIPT['build'](repo, tool=repo, staged=True)['reused_projection'] is True
+    assert b'PRIVATE-INJECTION' not in target.read_bytes()
+    assert b'"gross_cents":11900' in target.read_bytes()
+
+
+def test_proof_update_preserves_unstaged_dashboard_edits(staged_repo):
+    repo, archive, git = staged_repo
+    stage_pending_proof(repo, git)
+    target = repo/'dashboard.html'; target.write_bytes(b'USER EDIT')
+    with pytest.raises(ValueError, match='überschrieben'):
+        SCRIPT['build'](repo, tool=repo, staged=True)
+    assert target.read_bytes() == b'USER EDIT'
+
+
 def test_procedure_renderer_escapes_html_and_keeps_links_passive():
     from autobookkeeping.dashboard import procedure_document
     from bs4 import BeautifulSoup

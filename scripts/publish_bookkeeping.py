@@ -12,40 +12,62 @@ ROOT = TOOL / "daten"
 from autobookkeeping.archive import verify_checkpoint, atomic, encoded, sha
 from autobookkeeping.local_invoices import now
 from autobookkeeping.publication import resume, Publication
-from autobookkeeping.timestamps import verify_public, status
+from autobookkeeping.timestamps import cache_matches, verify_public, status
 from autobookkeeping.local_invoices import WorkflowError
 
 
-def confirm():
+def confirm(full=False):
     with Publication(ROOT, "confirm Bitcoin timestamps", mode="proofs") as publication:
+        cache_path = ROOT / 'timestamp-status.json'
+        previous = json.loads(cache_path.read_bytes()) if cache_path.exists() else {'version': 1, 'entries': {}}
         results = []; changed = []; cache={'version':1,'entries':{}}
+        reused = 0; checked = 0
         for statement in sorted((ROOT / "buchhaltung/nachweise").glob("*.json")):
             proof = Path(str(statement) + ".ots"); before = proof.read_bytes()
-            run = subprocess.run([sys.executable, str(TOOL / "scripts/ots_windows.py"), "upgrade", str(proof)],
-                                 capture_output=True, timeout=60)
+            old = previous.get('entries', {}).get(statement.stem, {}) if previous.get('version') == 1 else {}
+            if not full and cache_matches(old, statement.read_bytes(), before):
+                # Keep the date and confirmations of the actual historical check.
+                # Reuse must not pretend that a new network/Git check took place.
+                cache['entries'][statement.stem] = old
+                results.append({'git_commit': statement.stem, **old, 'reused': True})
+                reused += 1
+                continue
+            checked += 1
+            try:
+                run = subprocess.run([sys.executable, str(TOOL / "scripts/ots_windows.py"), "upgrade", str(proof)],
+                                     capture_output=True, timeout=60)
+                upgrade_pending = bool(run.returncode)
+            except subprocess.TimeoutExpired:
+                upgrade_pending = True
             if proof.read_bytes() != before: changed.append(proof.relative_to(ROOT).as_posix())
             entry = {"git_commit": statement.stem, "blockchain_verified": False, **status(statement, proof)}
             if entry["bitcoin_attestation_present"]:
                 try:
                     verify_checkpoint(ROOT, statement); entry.update(verify_public(statement, proof))
                 except Exception: entry["verification_pending"] = True
-            if run.returncode: entry["upgrade_pending"] = True
+            if upgrade_pending: entry["upgrade_pending"] = True
             cache['entries'][statement.stem] = {
                 'checked_at':now(), 'statement_sha256':sha(statement.read_bytes()),'proof_sha256':sha(proof.read_bytes()),
                 'blockchain_verified':entry['blockchain_verified'],
                 'verification_mode':entry.get('verification_mode'), 'block_height':entry.get('block_height'),
                 'block_time_utc':entry.get('block_time_utc'), 'confirmations':entry.get('confirmations')}
             results.append(entry)
-        atomic(ROOT/'timestamp-status.json',encoded(cache))
-    return {"ok": True, "timestamps": results, "upgraded_proofs": len(changed), "publication": publication.result}
+        if cache != previous:
+            atomic(cache_path, encoded(cache))
+    return {"ok": True, "timestamps": results, "checked_proofs": checked, "reused_proofs": reused,
+            "full_check": full, "upgraded_proofs": len(changed), "publication": publication.result}
 
 
 def main():
     parser = argparse.ArgumentParser(description="Buchhaltungs-Veröffentlichung und Bitcoin-Bestätigung")
-    parser.add_argument("command", choices=("resume", "status", "confirm")); args = parser.parse_args()
+    parser.add_argument("command", choices=("resume", "status", "confirm"))
+    parser.add_argument('--full', action='store_true', help='Alle Bitcoin-/Git-Nachweise erneut prüfen, auch bereits bestätigte')
+    args = parser.parse_args()
+    if args.full and args.command != 'confirm':
+        parser.error('--full ist nur für confirm vorgesehen')
     data_root()
     if args.command == "resume": result = resume(ROOT)
-    elif args.command == "confirm": result = confirm()
+    elif args.command == "confirm": result = confirm(full=args.full)
     else:
         path = ROOT / "output/publication.json"
         result = {"pending": path.exists(), "resume_command": ".venv\\Scripts\\python.exe -X utf8 scripts\\publish_bookkeeping.py resume"}

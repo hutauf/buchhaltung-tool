@@ -3,11 +3,31 @@ from __future__ import annotations
 
 import copy
 import hashlib
+from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import datetime, timezone
 
 from autobookkeeping.archive import encoded, sha
 
 FIELD = "audit_trail"
+_VERIFIED = ContextVar('audit_verified_in_current_operation', default=None)
+
+
+@contextmanager
+def verification_session():
+    """Reuse successful exact-catalog checks only inside one local operation.
+
+    The key covers ALL catalog bytes, including the entire baseline and every
+    event. No result survives this scope, and failed checks are never cached.
+    """
+    if _VERIFIED.get() is not None:
+        yield
+        return
+    token = _VERIFIED.set({})
+    try:
+        yield
+    finally:
+        _VERIFIED.reset(token)
 
 
 class _ReplayEncoding:
@@ -124,6 +144,20 @@ def apply(snapshot, change):
 
 
 def validate(catalog):
+    cache = _VERIFIED.get()
+    if cache is None:
+        return _validate(catalog)
+    digest = sha(encoded(catalog))
+    if digest not in cache:
+        result = _validate(catalog)
+        if len(cache) >= 8:
+            del cache[next(iter(cache))]
+        cache[digest] = result
+    # Callers cannot alter a verification result held by this operation.
+    return dict(cache[digest])
+
+
+def _validate(catalog):
     trail = catalog.get(FIELD)
     if trail is None:
         return {"status": "legacy_without_trail", "events": 0}

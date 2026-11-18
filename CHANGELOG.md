@@ -2,6 +2,22 @@
 
 ## Unveröffentlicht
 
+- Veröffentlichungen vermeiden doppelte Dashboard-Bauten bei exakt erkanntem
+  verwaltetem Git-Hook. Reine Nachweisänderungen verwenden die committete,
+  an Archivbytes und Generatorquellen gebundene Finanzprojektion erneut;
+  Änderungen und Altbestände führen zur bisherigen Vollprüfung. Zeitnachweise
+  im Git-Index werden gesammelt statt mit Einzelprozessen gelesen.
+- Innerhalb eines Veröffentlichungs-/Wiederaufnahmevorgangs erfolgreiche
+  Audit-Prüfungen ausschließlich für den SHA-256-identischen vollständigen
+  Katalog im Speicher wiederverwenden. Jeder geänderte Stand wird vollständig
+  geprüft; keine Cachedateien, kein Vertrauen über Vorgangsgrenzen hinweg.
+- `veroeffentlichen confirm` verwendet ausschließlich exakt dateigebundene,
+  bereits erfolgreich geprüfte Bitcoin-Ergebnisse erneut, ohne deren Prüfdatum
+  zu erneuern. `confirm --full` erzwingt alle historischen Git-/Bitcoin-Prüfungen.
+  Kalender-Timeouts bleiben offen; reine Wiederverwendung bestätigter Ergebnisse
+  erzeugt keinen Commit. Agentenablauf und Verfahrensbeschreibung Version 18
+  aktualisiert.
+
 - API-bestätigte unbezahlte eBay-Abbrüche als storniert statt als offene
   Zahlung ausweisen. Stabile Checklistenidentität und Aliasse bleiben erhalten;
   bezahlte Stornos durchlaufen weiterhin die Rechnungs-/Minderungsprüfung.

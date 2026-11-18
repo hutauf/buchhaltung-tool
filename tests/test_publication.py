@@ -275,6 +275,58 @@ def test_hook_can_reacquire_archive_lock(fixture):
     assert_complete(repo, archive, git, save(repo, archive))
 
 
+def test_managed_hook_builds_once_per_commit_and_refreshes_proof_counts(fixture, monkeypatch):
+    import sys
+    repo, archive, git = fixture
+    (repo/'output').mkdir(exist_ok=True)
+    hook = repo/'.git/hooks/pre-commit'
+    hook.write_bytes(("#!/bin/sh\nprintf 'build\\n' >> output/build-count\nexec '"
+        + Path(sys.executable).as_posix() + "' -X utf8 '"
+        + (repo.parent/'scripts/build_bookkeeping_dashboard.py').as_posix() + "' --staged\n").encode())
+    hook.chmod(0o755)
+    # The fixture uses the test runner's interpreter instead of installing a venv.
+    monkeypatch.setattr(Publication, 'dashboard_hook_installed', lambda self: True)
+    assert_complete(repo, archive, git, save(repo, archive))
+    assert (repo/'output/build-count').read_text().splitlines() == ['build', 'build']
+    snapshot = json.loads((repo/'dashboard.html').read_text(encoding='utf8').split(
+        '<script id="bookkeeping-data" type="application/json">')[1].split('</script>')[0])
+    assert snapshot['timestamps']['pending'] == 1
+
+
+def test_only_the_exact_executable_managed_hook_replaces_standalone_build(fixture):
+    import sys
+    repo, archive, git = fixture
+    publication = Publication(repo, 'synthetic')
+    assert publication.dashboard_hook_installed() is False
+    python = repo.parent/('.venv/Scripts/python.exe' if sys.platform == 'win32' else '.venv/bin/python')
+    python.parent.mkdir(parents=True); python.write_bytes(b'SYNTHETIC INTERPRETER PLACEHOLDER')
+    hook = repo/'.git/hooks/pre-commit'
+    expected = ("#!/bin/sh\n# bookkeeping-workspace generated hook\nexec '" + python.as_posix()
+        + "' -X utf8 '" + (repo.parent/'scripts/build_bookkeeping_dashboard.py').as_posix() + "' --staged\n").encode()
+    hook.write_bytes(expected); hook.chmod(0o755)
+    assert publication.dashboard_hook_installed() is True
+    hook.write_bytes(expected + b'\n# Custom hook remains outside the optimization\n')
+    assert publication.dashboard_hook_installed() is False
+
+
+def test_unchanged_proof_check_does_not_repeat_archive_verification(fixture, monkeypatch):
+    repo, archive, git = fixture
+    before = git('rev-parse', 'HEAD')
+    monkeypatch.setattr(Archive, 'verify', lambda self: pytest.fail('No data/proof change needs no new archive replay'))
+    with Publication(repo, 'unchanged confirmation', mode='proofs') as publication:
+        pass
+    assert publication.result == {'status': 'unchanged', 'new_commit': False}
+    assert git('rev-parse', 'HEAD') == before
+
+
+def test_ciphertext_change_during_proof_update_is_rejected_even_with_unchanged_manifest(fixture):
+    repo, archive, git = fixture
+    with pytest.raises(WorkflowError, match='verändert'):
+        with Publication(repo, 'proof check', mode='proofs'):
+            path = archive.root/'database.json.enc'
+            path.write_bytes(path.read_bytes() + b'SYNTHETIC TAMPER')
+
+
 def test_manual_stamp_failure_cannot_publish_statement_without_proof(fixture, monkeypatch):
     repo, archive, git = fixture; base = git('rev-parse', 'HEAD')
     with pytest.raises(OSError):

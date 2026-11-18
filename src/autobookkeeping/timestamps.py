@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 import hashlib
+import io
+import json
 import re
+import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
@@ -88,34 +91,83 @@ def verify_public(statement: Path, proof: Path) -> dict:
     raise ValueError("Keine Bitcoin-Attestierung über beide öffentlichen Quellen verifiziert: " + ", ".join(failures))
 
 
+def cache_matches(entry: dict, raw: bytes, proof: bytes) -> bool:
+    """Reuse a historical verification only for the exact attested file bytes."""
+    try:
+        checked_at = datetime.fromisoformat(entry['checked_at'])
+        if checked_at.tzinfo is None:
+            return False
+        detached = DetachedTimestampFile.deserialize(BytesDeserializationContext(proof))
+        heights = {a.height for _, a in detached.timestamp.all_attestations()
+                   if isinstance(a, BitcoinBlockHeaderAttestation)}
+        return (isinstance(detached.file_hash_op, OpSHA256)
+                and detached.timestamp.msg == hashlib.sha256(raw).digest()
+                and entry.get('blockchain_verified') is True
+                and entry.get('statement_sha256') == hashlib.sha256(raw).hexdigest()
+                and entry.get('proof_sha256') == hashlib.sha256(proof).hexdigest()
+                and type(entry.get('block_height')) is int and entry['block_height'] in heights
+                and entry.get('verification_mode') == 'public_explorers'
+                and type(entry.get('confirmations')) is int and entry['confirmations'] >= 6)
+    except Exception:
+        # Deserializers also use their own exception hierarchy. A malformed cache
+        # or proof must trigger verification, never a successful cache hit.
+        return False
+
+
+def _index_blobs(repo: Path, names: list[str]) -> dict[str, bytes | None]:
+    """Read the allowlisted proof paths in one process, including missing blobs."""
+    from autobookkeeping.workspace import git_environment
+    if any('\n' in name or '\r' in name for name in names):
+        raise ValueError('Ungültiger Nachweispfad')
+    data = subprocess.run(['git', '-C', str(repo), 'cat-file', '--batch'],
+                          input=''.join(':' + name + '\n' for name in names).encode('utf8'),
+                          capture_output=True, check=True, env=git_environment(), timeout=60).stdout
+    stream = io.BytesIO(data)
+    result = {}
+    for name in names:
+        header = stream.readline().split()
+        if len(header) == 2 and header[1] == b'missing':
+            result[name] = None
+            continue
+        if len(header) != 3 or header[1] != b'blob':
+            raise ValueError('Ungültige Git-Nachweisantwort')
+        size = int(header[2]); result[name] = stream.read(size)
+        if len(result[name]) != size or stream.read(1) != b'\n':
+            raise ValueError('Unvollständige Git-Nachweisantwort')
+    if stream.read():
+        raise ValueError('Unerwartete zusätzliche Git-Nachweise')
+    return result
+
+
 def dashboard_status(repo: Path, staged=False) -> dict:
     """Cached verification counts, bound to exact proof and statement bytes."""
-    import json
-    import subprocess
     from autobookkeeping.workspace import git_environment
-    from autobookkeeping.archive import sha
-    def read(name):
-        if staged:
-            try: return subprocess.check_output(['git','-C',str(repo),'show',':'+name],env=git_environment(),stderr=subprocess.PIPE)
-            except subprocess.CalledProcessError: return None
+    pattern = r'buchhaltung/nachweise/[a-f0-9]{40}(?:[a-f0-9]{24})?\.json'
+    if staged:
+        inventory = subprocess.check_output(['git', '-C', str(repo), 'ls-files', '-z', '--',
+                                            'buchhaltung/nachweise'], env=git_environment()).decode().split('\0')
+        names = [name for name in inventory if re.fullmatch(pattern, name)]
+        blobs = _index_blobs(repo, ['timestamp-status.json', *[n for name in names for n in (name, name + '.ots')]])
+        read = blobs.get
+    else:
+        names = [p.relative_to(repo).as_posix() for p in (repo/'buchhaltung/nachweise').glob('*.json')]
+    def read_worktree(name):
         path=repo/name
         return path.read_bytes() if path.is_file() else None
+    if not staged:
+        read = read_worktree
     cache=json.loads(read('timestamp-status.json') or b'{"entries":{}}')
-    names=subprocess.check_output(['git','-C',str(repo),'ls-files','-z','--','buchhaltung/nachweise'],env=git_environment()).decode().split('\0') if staged else [p.relative_to(repo).as_posix() for p in (repo/'buchhaltung/nachweise').glob('*.json')]
     result={'total':0,'verified':0,'pending':0,'unverified':0,'invalid':0}
     for name in names:
-        if not re.fullmatch(r'buchhaltung/nachweise/[a-f0-9]{40}(?:[a-f0-9]{24})?\.json',name): continue
+        if not re.fullmatch(pattern,name): continue
         result['total']+=1; raw=read(name); proof=read(name+'.ots')
         try:
             detached=DetachedTimestampFile.deserialize(BytesDeserializationContext(proof))
             if not isinstance(detached.file_hash_op,OpSHA256) or detached.timestamp.msg!=hashlib.sha256(raw).digest():
                 raise ValueError('Proof mismatch')
-            entry=cache.get('entries',{}).get(Path(name).stem,{})
+            entry=cache.get('entries',{}).get(Path(name).stem,{}) if cache.get('version') == 1 else {}
             heights={a.height for _,a in detached.timestamp.all_attestations() if isinstance(a,BitcoinBlockHeaderAttestation)}
-            if (entry.get('blockchain_verified') is True and entry.get('statement_sha256')==sha(raw)
-                and entry.get('proof_sha256')==sha(proof) and entry.get('block_height') in heights
-                and entry.get('verification_mode')=='public_explorers'
-                and type(entry.get('confirmations')) is int and entry['confirmations']>=6):
+            if cache_matches(entry, raw, proof):
                 result['verified']+=1
             elif heights: result['unverified']+=1
             else: result['pending']+=1

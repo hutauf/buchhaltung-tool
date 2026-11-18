@@ -13,6 +13,7 @@ from filelock import FileLock
 from autobookkeeping.archive import Archive, atomic, checkpoint, encoded, sha, verify_checkpoint
 from autobookkeeping.local_invoices import LocalInvoices, WorkflowError
 from autobookkeeping.timestamps import load_proof
+from autobookkeeping.audit_trail import verification_session
 from autobookkeeping.workspace import PUSH_TIMEOUT, assert_data_repo, assert_tool_clean, tool_root, git as workspace_git
 
 
@@ -69,7 +70,10 @@ class Publication:
             git(self.repo, "rev-parse", "--abbrev-ref", "@{upstream}")
             self.state = {"version": 1, "token": uuid.uuid4().hex, "action": self.action,
                           "base": base, "before_digest": self.digest(), "phase": "writing", "mode": self.mode, "tool_commit": assert_tool_clean()}
-            self.write(); return self
+            self.write()
+            self.verification_session = verification_session()
+            self.verification_session.__enter__()
+            return self
         except BaseException:
             self.lock.release(); raise
 
@@ -83,6 +87,7 @@ class Publication:
                 return False
             self.result = self.finish()
         finally:
+            self.verification_session.__exit__(None, None, None)
             self.lock.release()
         return False
 
@@ -107,6 +112,25 @@ class Publication:
             raise WorkflowError("Git-Index enthält fremde Dateien")
         git(self.repo, "commit", "-m", message)
         return self.head()
+
+    def dashboard_hook_installed(self):
+        """Only the exact managed hook can replace the redundant pre-build."""
+        path = Path(git(self.repo, 'rev-parse', '--git-path', 'hooks/pre-commit').decode().strip())
+        if not path.is_absolute():
+            path = self.repo / path
+        python = tool_root() / ('.venv/Scripts/python.exe' if sys.platform == 'win32' else '.venv/bin/python')
+        expected = ("#!/bin/sh\n# bookkeeping-workspace generated hook\nexec '" + python.as_posix()
+                    + "' -X utf8 '" + (tool_root() / 'scripts/build_bookkeeping_dashboard.py').as_posix()
+                    + "' --staged\n").encode()
+        return (path.is_file() and os.access(path, os.X_OK) and python.is_file()
+                and path.read_bytes().replace(b'\r\n', b'\n') == expected)
+
+    def prepare_dashboard(self):
+        # The managed hook builds and verifies the exact index that Git commits.
+        # Custom/missing hooks retain the previous standalone-build fallback.
+        if not self.dashboard_hook_installed():
+            subprocess.run([sys.executable, '-X', 'utf8', str(tool_root() / 'scripts/build_bookkeeping_dashboard.py')],
+                           cwd=self.repo, capture_output=True, check=True, timeout=60)
 
     def proof_changes(self):
         names = self.names("diff", "--name-only", "HEAD", "-z", "--", "buchhaltung/nachweise")
@@ -133,6 +157,10 @@ class Publication:
     def finish_proofs(self):
         state = self.state
         if self.digest() != state["before_digest"]: raise WorkflowError("Archiv während Nachweisaktualisierung verändert")
+        scope = self.names('diff', '--name-only', 'HEAD', '-z', '--', 'buchhaltung', 'bookkeeping_checklist.json.enc')
+        scope += self.names('ls-files', '--others', '--exclude-standard', '-z', '--', 'buchhaltung', 'bookkeeping_checklist.json.enc')
+        if any(not name.startswith('buchhaltung/nachweise/') for name in scope):
+            raise WorkflowError('Archiv während Nachweisaktualisierung verändert')
         names = self.proof_changes()
         message = "Bookkeeping proof update: " + state["token"]
         if self.head() != state["base"]:
@@ -142,6 +170,8 @@ class Publication:
         elif not names:
             self.path.unlink(); return {"status": "unchanged", "new_commit": False}
         else:
+            with FileLock(self.repo / 'output/archive.lock', timeout=0):
+                Archive(self.repo).verify()
             if any(n != 'timestamp-status.json' and not re.fullmatch(r"buchhaltung/nachweise/[a-f0-9]{40}(?:[a-f0-9]{24})?\.json(?:\.ots(?:\.bak)?)?", n) for n in names):
                 raise WorkflowError("Unerwartete Datei im Zeitnachweis; nicht automatisch committen")
             for name in names:
@@ -157,8 +187,7 @@ class Publication:
                 if name.endswith(".ots"):
                     if not list(load_proof(self.repo / name[:-4], self.repo / name).timestamp.all_attestations()):
                         raise WorkflowError("Zeitnachweis enthält keine Kalender-/Bitcoin-Attestierung")
-            subprocess.run([sys.executable,'-X','utf8',str(tool_root()/'scripts/build_bookkeeping_dashboard.py')],
-                           cwd=self.repo,capture_output=True,check=True,timeout=60)
+            self.prepare_dashboard()
             state["proof_commit"] = self.commit_paths([*names,'dashboard.html'], message)
         state["phase"] = "proof_push"; self.write()
         git(self.repo, "push")
@@ -174,8 +203,8 @@ class Publication:
         state = self.state
         if (self.repo / "output/local-invoice-transaction.enc").exists():
             raise WorkflowError("Unterbrochene Archivtransaktion: publish_bookkeeping.py resume ausführen")
-        with FileLock(self.repo / "output/archive.lock", timeout=0): Archive(self.repo).verify()
         if state.get("mode") == "proofs": return self.finish_proofs()
+        with FileLock(self.repo / "output/archive.lock", timeout=0): Archive(self.repo).verify()
         if state.get("after_digest") and self.digest() != state["after_digest"]:
             raise WorkflowError("Archiv wurde nach Beginn der Veröffentlichung verändert")
         if not state.get("data_commit"):
@@ -209,8 +238,7 @@ class Publication:
                             LocalInvoices(archive).commit(before, after, {})
                 atomic(self.repo / "tool-version.json", encoded({"version": 1, "git_commit": state["tool_commit"]}))
                 state["after_digest"] = self.digest(); state["phase"] = "commit"; self.write()
-                subprocess.run([sys.executable, "-X", "utf8", str(tool_root() / "scripts/build_bookkeeping_dashboard.py")],
-                               cwd=self.repo, capture_output=True, check=True, timeout=60)
+                self.prepare_dashboard()
                 changed = self.names("diff", "--name-only", "HEAD", "-z", "--", "buchhaltung", "bookkeeping_checklist.json.enc")
                 changed += self.names("ls-files", "--others", "--exclude-standard", "-z", "--", "buchhaltung", "bookkeeping_checklist.json.enc")
                 if not changed or any(not data_path(n) for n in changed): raise WorkflowError("Unerwartete Archivänderungen; keine fremden Dateien committen")
@@ -229,8 +257,7 @@ class Publication:
                 statement = checkpoint(self.repo, data_commit)
                 proof = self.ensure_proof(statement)
             names = [statement.relative_to(self.repo).as_posix(), proof.relative_to(self.repo).as_posix()]
-            subprocess.run([sys.executable,'-X','utf8',str(tool_root()/'scripts/build_bookkeeping_dashboard.py')],
-                           cwd=self.repo,capture_output=True,check=True,timeout=60)
+            self.prepare_dashboard()
             names.append('dashboard.html')
             state["proof_commit"] = self.commit_paths(names, "Bookkeeping timestamp: " + state["token"])
             state["phase"] = "proof_push"; self.write()
@@ -245,7 +272,7 @@ class Publication:
 
 def resume(repo):
     publication = Publication(repo, "resume")
-    with publication.lock:
+    with publication.lock, verification_session():
         if not publication.path.exists(): return {"status": "nothing_pending"}
         publication.state = json.loads(publication.path.read_bytes())
         publication.mode = publication.state.get("mode", "data")

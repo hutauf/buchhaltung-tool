@@ -197,6 +197,26 @@ Der Bericht wird mit Prüfbasis und SHA256 verschlüsselt als Übergabenachweis 
 
 Schreibende Haupt-CLIs prüfen zuerst Datenrolle, exakte Git-Wurzel, privaten Remote und eine saubere veröffentlichte Toolversion. Danach laufen Archivprüfung, Dashboard, Datencommit/Push und ein separater OTS-Commit/Push im privaten Repo. Dessen `tool-version.json` hält den verwendeten Code-Commit fest. Ein OTS-Kalendernachweis ist zunächst ausstehend; `confirm` holt spätere Bitcoin-Bestätigungen nach und veröffentlicht geänderte Nachweise. Keine Geldbewegung oder E-Mail wird dadurch ausgeführt.
 
+Der Abschluss wartet nicht auf Bitcoin-Blöcke. `buchhaltung veroeffentlichen
+confirm` getrennt von den einzelnen Rechnungs-/DHL-/Vine-Schritten ausführen,
+beispielsweise im täglichen Kontrolllauf. Der Standard prüft offene/geänderte
+Nachweise und verwendet bereits bestätigte Ergebnisse nur für exakt dieselben
+Dateien erneut; deren ursprünglicher Prüfzeitpunkt bleibt sichtbar. Für eine
+bewusste erneute Gesamtprüfung einschließlich historischer Git-Objekte und
+aktueller Bitcoin-Abfragen `buchhaltung veroeffentlichen confirm --full`
+verwenden. Ein Lauf, der ausschließlich unveränderte bestätigte Ergebnisse
+wiederverwendet, erzeugt keinen neuen Commit.
+
+Der verwaltete Git-Hook übernimmt den Dashboard-Bau unmittelbar vor dem Commit,
+ohne zusätzlichen vorherigen Komplettbau. Reine Nachweisänderungen übernehmen
+die schon geprüfte Finanzansicht aus dem vorherigen Commit nur bei unverändertem
+Archiv und identischen Generatorquellen; andernfalls erfolgt die Vollprüfung.
+Freigaben, Beleg-/Historienprüfung bei Datenänderungen sowie die
+`status`-/`resume`-Schritte bleiben erhalten. Eigene Hooks werden nicht ersetzt.
+Eine erfolgreiche Historienprüfung wird innerhalb desselben Vorgangs nur für
+einen SHA-256-identischen vollständigen Katalog im Speicher wiederverwendet;
+jede Änderung und jeder neue Vorgang benötigen erneut die vollständige Prüfung.
+
 ## Sicherheit und Updates
 
 Die Einrichtung installiert Hooks: normale Commits/Pushes im Toolcheckout werden blockiert; der Datenhook prüft den Git-Index und erzeugt das Dashboard. Hooks sind Schutz gegen Versehen, keine absolute Berechtigungssperre. Die Buchhaltungs-CLIs prüfen das Ziel unabhängig davon; ein fehlendes `daten/.git` blockiert sie.

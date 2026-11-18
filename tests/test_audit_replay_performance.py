@@ -114,3 +114,53 @@ def test_unchanged_payload_is_not_reserialized_for_every_historical_state(monkey
     # A workload bound, independent of machine speed: replay must not serialize
     # the unchanged records sixty times. Historical hashes remain mandatory.
     assert serialized_bytes < 5 * len(encoded(catalog))
+
+
+def test_operation_cache_reuses_only_successful_exact_catalog_bytes_and_is_discarded(monkeypatch):
+    catalog = legacy_catalog([{'records': {'one': {'flag': True}}},
+                              {'records': {'one': {'flag': False}}}])
+    calls = []; original = audit._validate
+    def counted(value):
+        calls.append(True)
+        return original(value)
+    monkeypatch.setattr(audit, '_validate', counted)
+    with audit.verification_session():
+        first = audit.validate(catalog)
+        first['status'] = 'tampered returned result'
+        assert audit.validate(copy.deepcopy(catalog))['status'] == 'verified'
+        assert len(calls) == 1
+        with audit.verification_session():
+            assert audit.validate(catalog)['status'] == 'verified'
+        assert len(calls) == 1
+        # False and 0 compare equal in Python, but have different canonical bytes.
+        broken = copy.deepcopy(catalog); broken['records']['one']['flag'] = 0
+        for _ in range(2):
+            with pytest.raises(ValueError, match='Datenbank'):
+                audit.validate(broken)
+        assert len(calls) == 3
+    assert audit.validate(catalog)['status'] == 'verified'
+    assert len(calls) == 4
+
+
+@pytest.mark.parametrize('part', ['baseline', 'early_event', 'current', 'last_hash'])
+def test_operation_cache_does_not_conceal_any_history_or_current_state_change(part):
+    catalog = legacy_catalog([{'counter': 0}, {'counter': 1}, {'counter': 2}])
+    with audit.verification_session():
+        assert audit.validate(catalog)['status'] == 'verified'
+        if part == 'baseline': catalog['audit_trail']['baseline']['counter'] = 99
+        elif part == 'early_event': catalog['audit_trail']['events'][0]['writer'] = 'SYNTHETIC ALTERED'
+        elif part == 'current': catalog['counter'] = 99
+        else: catalog['audit_trail']['events'][-1]['sha256'] = '0' * 64
+        with pytest.raises(ValueError):
+            audit.validate(catalog)
+
+
+def test_operation_cache_is_cleared_on_error(monkeypatch):
+    catalog = legacy_catalog([{'counter': 0}, {'counter': 1}])
+    with pytest.raises(OSError):
+        with audit.verification_session():
+            audit.validate(catalog)
+            raise OSError('Synthetic interrupted operation')
+    monkeypatch.setattr(audit, '_validate', lambda value: pytest.fail('A later operation must verify again'))
+    with pytest.raises(pytest.fail.Exception):
+        audit.validate(catalog)
