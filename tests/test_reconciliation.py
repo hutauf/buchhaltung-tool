@@ -130,3 +130,29 @@ def test_unpaid_api_cancellation_is_closed_but_paid_cancellation_stays_checked(t
     assert archive.verify()['ok']
     assert public_status(archive.catalog())['open_findings'] == 0
     assert catalog['records'] == before
+
+
+def test_explanation_cli_reports_a_completed_write_without_duplicate_ok(tmp_path, monkeypatch, capsys):
+    import importlib.util
+    from pathlib import Path
+    import json
+    import sys
+    script = Path(__file__).resolve().parents[1] / 'scripts' / 'reconcile_ebay.py'
+    spec = importlib.util.spec_from_file_location('synthetic_reconcile_cli', script)
+    module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+    class FakePublication:
+        def __init__(self, *args, **kwargs): self.result = {'status': 'published_ots_pending'}
+        def __enter__(self): return self
+        def __exit__(self, *args): return False
+    monkeypatch.setattr(module, 'Publication', FakePublication)
+    monkeypatch.setattr(module, 'data_root', lambda: tmp_path)
+    monkeypatch.setattr(module, 'Archive', lambda root: SimpleNamespace(repo=root))
+    monkeypatch.setattr(module, 'explain', lambda *args: {'ok': True, 'status': 'explained',
+                                                       'financial_records_changed': False})
+    monkeypatch.setattr(sys, 'argv', [str(script), 'klaeren', '--ref', 'synthetic-ref',
+                                    '--reason', 'Synthetic private sale', '--approved'])
+    module.main()
+    result = json.loads(capsys.readouterr().out)
+    assert result['ok'] is True and result['status'] == 'explained'
+    assert result['financial_records_changed'] is False
+    assert result['publication']['status'] == 'published_ots_pending'

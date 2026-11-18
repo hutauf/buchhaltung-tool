@@ -51,7 +51,7 @@ def main():
                 checklist=ChecklistStore(args.checklist.resolve()).load() if args.checklist else ChecklistStore().load()
                 result=scan(archive, EbayTradingClient(load_settings()), checklist, args.days, args.save)
                 if not args.details: result.pop('rows', None)
-    print(json.dumps(dict(ok=True, **result, publication=publication.result), ensure_ascii=False, indent=2))
+    print(json.dumps(dict(result, ok=True, publication=publication.result), ensure_ascii=False, indent=2))
 
 
 if __name__=='__main__':

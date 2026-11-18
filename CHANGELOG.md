@@ -5,7 +5,8 @@
 - API-bestätigte unbezahlte eBay-Abbrüche als storniert statt als offene
   Zahlung ausweisen. Stabile Checklistenidentität und Aliasse bleiben erhalten;
   bezahlte Stornos durchlaufen weiterhin die Rechnungs-/Minderungsprüfung.
-  Verfahrensbeschreibung Version 17.
+  Verfahrensbeschreibung Version 17. Erfolgreich gespeicherte Abweichungsvermerke
+  werden ohne doppeltes Erfolgsfeld korrekt als abgeschlossen gemeldet.
 
 - Vollständige Audit-Replays verwenden bytegleiche JSON-Fragmente unveränderter
   Datensätze erneut. Ereigniskette, Vor-/Nachzustände und aktueller Katalog werden
